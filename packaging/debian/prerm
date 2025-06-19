@@ -1,0 +1,6 @@
+#!/bin/bash
+set -e
+
+# Stop and disable service
+systemctl stop photoframe || true
+systemctl disable photoframe || true

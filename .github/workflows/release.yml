@@ -1,0 +1,185 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  build-deb:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.23'
+        
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        
+    - name: Install packaging tools
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y ruby ruby-dev rubygems build-essential
+        sudo gem install fpm
+        
+    - name: Build Go backend for ARM targets
+      run: |
+        cd backend
+        go mod tidy
+        
+        # Pi Zero (ARMv6)
+        GOOS=linux GOARCH=arm GOARM=6 go build -ldflags="-s -w" -o ../digital-photo-frame-armv6 .
+        
+        # Pi 3/4 (ARMv7)  
+        GOOS=linux GOARCH=arm GOARM=7 go build -ldflags="-s -w" -o ../digital-photo-frame-armv7 .
+        
+        # Pi 64-bit (ARM64)
+        GOOS=linux GOARCH=arm64 go build -ldflags="-s -w" -o ../digital-photo-frame-arm64 .
+        
+    - name: Build web frontend
+      run: |
+        cd frontend
+        npm ci
+        npm run build
+        
+    - name: Prepare package structure
+      run: |
+        mkdir -p package-root/opt/photoframe
+        mkdir -p package-root/etc/photoframe
+        mkdir -p package-root/var/lib/photoframe/images
+        mkdir -p package-root/usr/lib/systemd/system
+        mkdir -p package-root/usr/bin
+        
+        # Copy web frontend
+        cp -r frontend/dist/* package-root/opt/photoframe/
+        
+        # Copy config template
+        cp backend/config.yaml.example package-root/etc/photoframe/config.yaml
+        
+        # Copy systemd service
+        cp packaging/systemd/photoframe.service package-root/usr/lib/systemd/system/
+        
+        # Copy wrapper script
+        cp packaging/wrapper/digital-photo-frame package-root/usr/bin/
+        chmod +x package-root/usr/bin/digital-photo-frame
+        
+    - name: Copy package scripts
+      run: |
+        mkdir -p scripts
+        cp packaging/debian/* scripts/
+        
+    - name: Build Pi Zero package (ARMv6)
+      run: |
+        # Copy ARMv6 binary
+        cp digital-photo-frame-armv6 package-root/opt/photoframe/digital-photo-frame-armv6l
+        
+        VERSION=${GITHUB_REF#refs/tags/v}
+        echo "Building version: $VERSION"
+        fpm -s dir -t deb -n photoframe-pi-zero -v "$VERSION" \
+          --architecture armhf \
+          --depends "libc6" \
+          --description "Digital Photo Frame for Raspberry Pi Zero" \
+          --url "https://github.com/${{ github.repository }}" \
+          --maintainer "${{ github.actor }}" \
+          --license "MIT" \
+          --after-install scripts/postinst \
+          --before-remove scripts/prerm \
+          --after-remove scripts/postrm \
+          --deb-systemd package-root/usr/lib/systemd/system/photoframe.service \
+          -C package-root \
+          opt etc var usr
+          
+    - name: Build Pi 3/4 package (ARMv7)
+      run: |
+        # Copy ARMv7 binary
+        cp digital-photo-frame-armv7 package-root/opt/photoframe/digital-photo-frame-armv7l
+        
+        VERSION=${GITHUB_REF#refs/tags/v}
+        fpm -s dir -t deb -n photoframe-pi -v "$VERSION" \
+          --architecture armhf \
+          --depends "libc6" \
+          --description "Digital Photo Frame for Raspberry Pi 3/4" \
+          --url "https://github.com/${{ github.repository }}" \
+          --maintainer "${{ github.actor }}" \
+          --license "MIT" \
+          --after-install scripts/postinst \
+          --before-remove scripts/prerm \
+          --after-remove scripts/postrm \
+          --deb-systemd package-root/usr/lib/systemd/system/photoframe.service \
+          -C package-root \
+          opt etc var usr
+          
+    - name: Build Pi 64-bit package (ARM64)
+      run: |
+        # Copy ARM64 binary
+        cp digital-photo-frame-arm64 package-root/opt/photoframe/digital-photo-frame-aarch64
+        
+        VERSION=${GITHUB_REF#refs/tags/v}
+        fpm -s dir -t deb -n photoframe-pi64 -v "$VERSION" \
+          --architecture arm64 \
+          --depends "libc6" \
+          --description "Digital Photo Frame for Raspberry Pi 64-bit" \
+          --url "https://github.com/${{ github.repository }}" \
+          --maintainer "${{ github.actor }}" \
+          --license "MIT" \
+          --after-install scripts/postinst \
+          --before-remove scripts/prerm \
+          --after-remove scripts/postrm \
+          --deb-systemd package-root/usr/lib/systemd/system/photoframe.service \
+          -C package-root \
+          opt etc var usr
+        
+    - name: Upload packages
+      uses: actions/upload-artifact@v4
+      with:
+        name: debian-packages
+        path: "*.deb"
+        
+    - name: Create Release
+      if: startsWith(github.ref, 'refs/tags/')
+      uses: softprops/action-gh-release@v1
+      with:
+        files: "*.deb"
+        body: |
+          ## Debian Packages
+          
+          ### Installation
+          ```bash
+          # Pi Zero
+          wget photoframe-pi-zero_*.deb
+          sudo apt install ./photoframe-pi-zero_*.deb
+          
+          # Pi 3/4
+          wget photoframe-pi_*.deb  
+          sudo apt install ./photoframe-pi_*.deb
+          
+          # Pi 64-bit
+          wget photoframe-pi64_*.deb
+          sudo apt install ./photoframe-pi64_*.deb
+          ```
+          
+          ### Configuration
+          Edit `/etc/photoframe/config.yaml` then restart:
+          ```bash
+          sudo systemctl restart photoframe
+          ```
+          
+          ### Management
+          ```bash
+          sudo systemctl start/stop/restart photoframe
+          sudo journalctl -u photoframe -f
+          ```
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

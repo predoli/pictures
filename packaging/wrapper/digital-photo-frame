@@ -1,0 +1,33 @@
+#!/bin/bash
+# Architecture-aware wrapper script for digital photo frame
+
+# Get the architecture and map to our binary naming
+ARCH=$(uname -m)
+
+case $ARCH in
+    armv6l)
+        BINARY="/opt/photoframe/digital-photo-frame-armv6l"
+        ;;
+    armv7l)
+        BINARY="/opt/photoframe/digital-photo-frame-armv7l"
+        ;;
+    aarch64)
+        BINARY="/opt/photoframe/digital-photo-frame-aarch64"
+        ;;
+    x86_64)
+        BINARY="/opt/photoframe/digital-photo-frame-x86_64"
+        ;;
+    *)
+        echo "Error: Unsupported architecture: $ARCH"
+        exit 1
+        ;;
+esac
+
+# Check if binary exists
+if [ ! -f "$BINARY" ]; then
+    echo "Error: Binary not found: $BINARY"
+    exit 1
+fi
+
+# Execute the appropriate binary
+exec "$BINARY" "$@"

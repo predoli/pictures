@@ -1,0 +1,25 @@
+[Unit]
+Description=Digital Photo Frame
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+User=photoframe
+Group=photoframe
+WorkingDirectory=/opt/photoframe
+ExecStart=/usr/bin/digital-photo-frame -config=/etc/photoframe/config.yaml
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+# Security
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/var/lib/photoframe /var/log/photoframe
+
+[Install]
+WantedBy=multi-user.target

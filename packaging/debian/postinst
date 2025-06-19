@@ -1,0 +1,20 @@
+#!/bin/bash
+set -e
+
+# Create photoframe user
+if ! id photoframe >/dev/null 2>&1; then
+  useradd --system --home /var/lib/photoframe --shell /bin/false photoframe
+fi
+
+# Set permissions
+chown -R photoframe:photoframe /var/lib/photoframe
+chown photoframe:photoframe /etc/photoframe/config.yaml
+
+# Enable and start service
+systemctl daemon-reload
+systemctl enable photoframe
+systemctl start photoframe
+
+echo "Digital Photo Frame installed!"
+echo "Edit /etc/photoframe/config.yaml to configure"
+echo "Access at: http://$(hostname -I | awk '{print $1}'):8080"

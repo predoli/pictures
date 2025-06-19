@@ -1,0 +1,28 @@
+# Configuration files
+config.yaml
+config.yml
+
+# Go build outputs
+digital-photo-frame
+digital-photo-frame.exe
+digital-photo-frame-*
+
+# Go module cache
+go.sum
+
+# Logs
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Local development
+.env
+.env.local

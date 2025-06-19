@@ -1,0 +1,19 @@
+server:
+  host: "0.0.0.0"
+  port: 8080
+
+directories:
+  - path: "./images"
+
+webdav:
+  sync_interval: "1h"
+  servers:
+    # Example WebDAV server configuration
+    # - url: "https://your-webdav-server.com"
+    #   username: "your-username"
+    #   password: "your-password"
+    #   remote_path: "/photos"
+    #   local_path: "./images/webdav"
+
+logging:
+  level: "info"

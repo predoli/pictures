@@ -1,0 +1,111 @@
+openapi: 3.0.3
+info:
+  title: Digital Photo Frame API
+  description: API for digital photo frame backend
+  version: 1.0.0
+servers:
+  - url: http://localhost:8080
+    description: Development server
+
+paths:
+  /images:
+    get:
+      summary: Get images with base64 encoded data
+      description: Returns a list of images with base64 encoded image data and specified ordering
+      parameters:
+        - in: query
+          name: count
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+          description: Number of images to return
+        - in: query
+          name: ordering
+          required: true
+          schema:
+            type: string
+            enum: [name_asc, name_desc, date_asc, date_desc, random]
+          description: How to order the images
+        - in: query
+          name: last_image
+          required: false
+          schema:
+            type: string
+          description: Filename of the last used image to determine starting point
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  images:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Image'
+                  total_count:
+                    type: integer
+                    description: Total number of available images
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+components:
+  schemas:
+    Image:
+      type: object
+      properties:
+        filename:
+          type: string
+          description: Name of the image file
+        data:
+          type: string
+          format: byte
+          description: Base64 encoded image data
+        mime_type:
+          type: string
+          description: MIME type of the image (e.g., image/jpeg, image/png)
+        size:
+          type: integer
+          description: File size in bytes
+        width:
+          type: integer
+          description: Image width in pixels
+        height:
+          type: integer
+          description: Image height in pixels
+        modified_date:
+          type: string
+          format: date-time
+          description: Last modified date of the image
+      required:
+        - filename
+        - data
+        - mime_type
+        - size
+        - modified_date
+    
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Error message
+        code:
+          type: integer
+          description: Error code
+      required:
+        - error
+        - code
