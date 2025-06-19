@@ -26,3 +26,27 @@ Thumbs.db
 # Local development
 .env
 .env.local
+
+# Image files
+*.jpg
+*.jpeg
+*.png
+*.gif
+*.bmp
+*.webp
+*.tiff
+*.tif
+*.svg
+*.ico
+*.heic
+*.heif
+*.raw
+*.cr2
+*.nef
+*.arw
+*.dng
+
+# Image directories
+images/
+photos/
+pics/
