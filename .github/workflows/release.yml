@@ -68,7 +68,8 @@ jobs:
         # Copy config template
         cp backend/config.yaml.example package-root/etc/photoframe/config.yaml
         
-        # Copy only the frontend service (backend service handled by --deb-systemd)
+        # Copy systemd services
+        cp packaging/systemd/photoframe.service package-root/lib/systemd/system/
         cp packaging/systemd/photoframe-frontend.service package-root/lib/systemd/system/
         
         # Copy wrapper script
@@ -107,8 +108,6 @@ jobs:
           --after-install scripts/postinst \
           --before-remove scripts/prerm \
           --after-remove scripts/postrm \
-          --deb-systemd package-root/lib/systemd/system/photoframe.service \
-          --deb-systemd package-root/lib/systemd/system/photoframe-frontend.service \
           -C package-root \
           opt etc var usr lib
           
@@ -134,8 +133,6 @@ jobs:
           --after-install scripts/postinst \
           --before-remove scripts/prerm \
           --after-remove scripts/postrm \
-          --deb-systemd package-root/lib/systemd/system/photoframe.service \
-          --deb-systemd package-root/lib/systemd/system/photoframe-frontend.service \
           -C package-root \
           opt etc var usr lib
           
@@ -161,8 +158,6 @@ jobs:
           --after-install scripts/postinst \
           --before-remove scripts/prerm \
           --after-remove scripts/postrm \
-          --deb-systemd package-root/lib/systemd/system/photoframe.service \
-          --deb-systemd package-root/lib/systemd/system/photoframe-frontend.service \
           -C package-root \
           opt etc var usr lib
         
