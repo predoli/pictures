@@ -54,6 +54,41 @@ jobs:
         npm ci
         npm run build
         
+    - name: Build Tauri frontend for ARM targets (best effort)
+      run: |
+        cd frontend
+        
+        echo "Attempting Tauri builds for ARM targets..."
+        
+        # Pi Zero/1 (ARM)
+        echo "Building for ARM (Pi Zero)..."
+        npm run tauri build -- --target arm-unknown-linux-gnueabihf || echo "ARM build failed, continuing..."
+        
+        # Pi 3/4 (ARMv7)
+        echo "Building for ARMv7 (Pi 3/4)..."
+        npm run tauri build -- --target armv7-unknown-linux-gnueabihf || echo "ARMv7 build failed, continuing..."
+        
+        # Pi 64-bit (ARM64)
+        echo "Building for ARM64 (Pi 64-bit)..."
+        npm run tauri build -- --target aarch64-unknown-linux-gnu || echo "ARM64 build failed, continuing..."
+        
+        # Debug: Show what was built
+        echo "Tauri build results:"
+        find src-tauri/target -name "photo-frame" -type f 2>/dev/null | head -10 || echo "No binaries found"
+        
+        # Copy any successful builds
+        mkdir -p ../release-binaries
+        find src-tauri/target -name "photo-frame" -type f 2>/dev/null | while read binary; do
+          echo "Found binary: $binary"
+          target_dir=$(echo $binary | cut -d'/' -f3)
+          echo "Copying to: ../release-binaries/photo-frame-$target_dir"
+          cp "$binary" "../release-binaries/photo-frame-$target_dir" || true
+        done
+        
+        # Show what we copied
+        echo "Release binaries:"
+        ls -la ../release-binaries/ | grep photo-frame || echo "No photo-frame binaries copied"
+        
     - name: Prepare package structure
       run: |
         mkdir -p package-root/opt/photoframe
