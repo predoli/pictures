@@ -13,139 +13,160 @@ permissions:
   packages: write
 
 jobs:
-  build-deb:
+  build-go-backend:
     runs-on: ubuntu-22.04
-    
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - uses: actions/checkout@v4
       
-    - name: Cache rust build artifacts
-      uses: Swatinem/rust-cache@v2
-      with:
-        workspaces: frontend/src-tauri
-        cache-on-failure: true
-        
-    - name: Build ARM64 app using arm-runner
-      uses: pguyot/arm-runner-action@v2.6.5
-      with:
-        base_image: https://dietpi.com/downloads/images/DietPi_RPi5-ARMv8-Bookworm.img.xz
-        cpu: cortex-a72
-        bind_mount_repository: true
-        image_additional_mb: 10240
-        optimize_image: no
-        commands: |
-          export HOME=/root
-          export CARGO_REGISTRIES_CRATES_IO_PROTOCOL=sparse
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.23'
           
-          apt-get update -y --allow-releaseinfo-change
-          apt-get autoremove -y
-          apt-get install -y --no-install-recommends --no-install-suggests \
-            curl libwebkit2gtk-4.1-dev build-essential libssl-dev \
-            libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev \
-            ruby ruby-dev rubygems pkg-config
-            
-          # Install Node.js
-          curl -fsSL https://deb.nodesource.com/setup_18.x | bash -
-          apt-get install -y nodejs
-          
-          # Install Rust
-          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-          . ~/.cargo/env
-          
-          # Install FPM for packaging
-          gem install fpm
-          
-          # Build Go backend
+      - name: Build Go backend for ARM64
+        run: |
           cd backend
-          export GOOS=linux GOARCH=arm64
-          curl -L https://go.dev/dl/go1.23.linux-arm64.tar.gz | tar -xz -C /usr/local
-          export PATH=/usr/local/go/bin:$PATH
           go mod tidy
-          go build -ldflags="-s -w" -o ../digital-photo-frame-arm64 .
-          cd ..
+          GOOS=linux GOARCH=arm64 go build -ldflags="-s -w" -o ../digital-photo-frame-arm64 .
           
-          # Build Tauri frontend
+      - name: Upload Go binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: go-backend-arm64
+          path: digital-photo-frame-arm64
+
+  build-tauri-app:
+    runs-on: ubuntu-22.04
+    needs: build-go-backend
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Download Go backend
+        uses: actions/download-artifact@v4
+        with:
+          name: go-backend-arm64
+          
+      - name: Install dependencies (Ubuntu only)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev
+
+      - name: Rust setup
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-unknown-linux-gnu
+
+      - name: Install cross-compilation tools
+        run: |
+          sudo apt-get install -y gcc-aarch64-linux-gnu
+          
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: './frontend/src-tauri -> target'
+
+      - name: Sync node version and setup cache
+        uses: actions/setup-node@v4
+        with:
+          node-version: 'lts/*'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        run: |
           cd frontend
           npm ci
-          npm run tauri build
-          cd ..
+
+      - name: Build the app for ARM64
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CC_aarch64_unknown_linux_gnu: aarch64-linux-gnu-gcc
+          CXX_aarch64_unknown_linux_gnu: aarch64-linux-gnu-g++
+          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
+        with:
+          projectPath: frontend
+          args: --target aarch64-unknown-linux-gnu
           
+  create-debian-package:
+    runs-on: ubuntu-22.04
+    needs: [build-go-backend, build-tauri-app]
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: '*'
+          merge-multiple: true
+          
+      - name: Install packaging tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ruby ruby-dev rubygems build-essential
+          sudo gem install fpm
+          
+      - name: Create Debian package
+        run: |
           # Create package structure
           mkdir -p package-root/opt/photoframe
           mkdir -p package-root/etc/photoframe
           mkdir -p package-root/usr/bin
           
-          # Copy Tauri frontend binary
-          cp frontend/src-tauri/target/release/photo-frame-frontend package-root/opt/photoframe/
-          
-          # Copy Go backend binary
+          # Copy binaries
           cp digital-photo-frame-arm64 package-root/opt/photoframe/digital-photo-frame-aarch64
+          # Tauri binary will be in artifacts
+          find . -name "photo-frame-frontend" -type f -exec cp {} package-root/opt/photoframe/ \;
           
-          # Copy config template
+          # Copy config and scripts
           cp backend/config.yaml.example package-root/etc/photoframe/config.yaml
-          
-          # Copy wrapper script
           cp packaging/wrapper/digital-photo-frame package-root/usr/bin/
           chmod +x package-root/usr/bin/digital-photo-frame
           
-          # Build Debian package
+          # Build package
           VERSION=${GITHUB_REF#refs/tags/v}
           if [ -z "$VERSION" ] || [ "$VERSION" = "$GITHUB_REF" ]; then
             VERSION="0.0.0-$(date +%Y%m%d%H%M%S)"
           fi
-          echo "Building version: $VERSION"
           
           fpm -s dir -t deb -n photoframe-pi64 -v "$VERSION" \
             --architecture arm64 \
             --depends "libc6" \
             --description "Digital Photo Frame for Raspberry Pi 64-bit" \
-            --url "https://github.com/$GITHUB_REPOSITORY" \
-            --maintainer "$GITHUB_ACTOR" \
+            --url "https://github.com/${{ github.repository }}" \
+            --maintainer "${{ github.actor }}" \
             --license "MIT" \
             --after-install packaging/debian/postinst \
             -C package-root \
             opt etc usr
-        
-    - name: Upload packages
-      uses: actions/upload-artifact@v4
-      with:
-        name: debian-packages
-        path: "*.deb"
-        
-    - name: Create Release
-      if: startsWith(github.ref, 'refs/tags/')
-      uses: softprops/action-gh-release@v1
-      with:
-        files: "*.deb"
-        body: |
-          ## Digital Photo Frame - ARM64 Only
+            
+      - name: Upload Debian package
+        uses: actions/upload-artifact@v4
+        with:
+          name: debian-package
+          path: "*.deb"
           
-          Simplified release for Raspberry Pi 64-bit OS.
-          
-          ### Installation
-          ```bash
-          # Download and install
-          wget photoframe-pi64_*.deb
-          sudo apt install ./photoframe-pi64_*.deb
-          ```
-          
-          ### Configuration
-          ```bash
-          # Edit config
-          sudo nano /etc/photoframe/config.yaml
-          ```
-          
-          ### Manual Usage
-          ```bash
-          # Run backend
-          cd /etc/photoframe && digital-photo-frame
-          
-          # Run frontend (fullscreen)
-          /opt/photoframe/photo-frame-frontend --fullscreen
-          ```
-          
-          ### Access
-          Web interface: `http://your-pi-ip:8080`
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Create Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v1
+        with:
+          files: "*.deb"
+          body: |
+            ## Digital Photo Frame - ARM64
+            
+            ### Installation
+            ```bash
+            wget photoframe-pi64_*.deb
+            sudo apt install ./photoframe-pi64_*.deb
+            ```
+            
+            ### Usage
+            ```bash
+            # Run backend
+            cd /etc/photoframe && digital-photo-frame
+            
+            # Run frontend
+            /opt/photoframe/photo-frame-frontend --fullscreen
+            ```
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
