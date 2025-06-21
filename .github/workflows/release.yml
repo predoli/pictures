@@ -19,14 +19,10 @@ jobs:
         with:
           go-version: '1.21.x'
           
-      - name: Install dependencies
-        run: |
-          cd backend
-          go mod download
-          
       - name: Build Go backend for ARM64
         run: |
           cd backend
+          go mod tidy
           GOOS=linux GOARCH=arm64 go build -ldflags="-s -w" -o ../digital-photo-frame-arm64 .
           
       - name: Upload Go binary
