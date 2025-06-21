@@ -77,6 +77,12 @@ jobs:
           cd frontend
           npm ci
 
+      - name: Clean Cargo cache
+        run: |
+          cd frontend/src-tauri
+          cargo clean
+          rm -f Cargo.lock
+
       - name: Build the app for ARM64
         uses: tauri-apps/tauri-action@v0
         env:
