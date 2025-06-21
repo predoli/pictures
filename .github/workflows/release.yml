@@ -39,9 +39,13 @@ jobs:
         
     - name: Install Tauri dependencies
       run: |
-        # Search for available webkit packages
+        # Search for available packages
+        echo "=== Available webkit packages ==="
         apt-cache search webkit2gtk | grep dev
+        echo "=== Available javascriptcore packages ==="
         apt-cache search javascriptcore | grep dev
+        echo "=== Available soup packages ==="
+        apt-cache search libsoup | grep dev
         
         # Install what's available
         sudo apt-get install -y \
@@ -51,7 +55,8 @@ jobs:
           libssl-dev \
           pkg-config \
           $(apt-cache search webkit2gtk | grep -E 'libwebkit2gtk.*-dev' | head -1 | cut -d' ' -f1) \
-          $(apt-cache search javascriptcore | grep -E 'libjavascriptcore.*-dev' | head -1 | cut -d' ' -f1)
+          $(apt-cache search javascriptcore | grep -E 'libjavascriptcore.*-dev' | head -1 | cut -d' ' -f1) \
+          $(apt-cache search libsoup | grep -E 'libsoup.*-dev' | head -1 | cut -d' ' -f1)
         
     - name: Build Go backend
       run: |
