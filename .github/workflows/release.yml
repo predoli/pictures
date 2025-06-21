@@ -52,10 +52,24 @@ jobs:
           sudo apt-get install -y libwebkit2gtk-4.0-dev || \
           echo "Warning: webkit not available"
           
+        # Try soup packages (Tauri 1.5 needs libsoup-2.4)
+        sudo apt-get install -y \
+          libsoup2.4-dev || \
+          sudo apt-get install -y libsoup-2.4-dev || \
+          echo "Warning: libsoup-2.4 not available, trying workaround"
+          
         # Try other GUI deps
         sudo apt-get install -y \
           libayatana-appindicator3-dev \
           librsvg2-dev || echo "Warning: some GUI deps not available"
+          
+        # If libsoup-2.4 is not available, try adding older repos
+        if ! pkg-config --exists libsoup-2.4; then
+          echo "Adding universe repository for older packages"
+          sudo add-apt-repository universe -y
+          sudo apt-get update
+          sudo apt-get install -y libsoup2.4-dev || echo "Still no libsoup-2.4"
+        fi
         
     - name: Install packaging tools
       run: |
