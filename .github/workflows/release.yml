@@ -32,37 +32,32 @@ jobs:
           path: digital-photo-frame-arm64
 
   build-arm64-tauri:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04-arm
     steps:
       - uses: actions/checkout@v4
-      
-      - name: Build ARM64 app using arm-runner
-        uses: pguyot/arm-runner-action@v2.6.5
+
+      - name: setup node
+        uses: actions/setup-node@v4
         with:
-          base_image: https://dietpi.com/downloads/images/DietPi_RPi5-ARMv8-Bookworm.img.xz
-          cpu: cortex-a72
-          bind_mount_repository: true
-          image_additional_mb: 10240
-          optimize_image: no
-          commands: |
-            # Install dependencies
-            apt-get update -y --allow-releaseinfo-change
-            apt-get install -y curl build-essential libssl-dev pkg-config \
-              libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev \
-              librsvg2-dev
-            
-            # Install Node.js
-            curl -fsSL https://deb.nodesource.com/setup_18.x | bash -
-            apt-get install -y nodejs
-            
-            # Install Rust
-            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-            . ~/.cargo/env
-            
-            # Build Tauri frontend
-            cd frontend
-            npm install
-            npm run tauri build
+          node-version: lts/*
+
+      - name: install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev patchelf
+
+      - name: install frontend dependencies
+        run: |
+          cd frontend
+          npm install
+
+      - name: build tauri app
+        run: |
+          cd frontend
+          npm run tauri build
             
       - name: Upload Tauri binary
         uses: actions/upload-artifact@v4
