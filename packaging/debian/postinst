@@ -1,43 +1,16 @@
 #!/bin/bash
 set -e
 
-# Create photoframe user (with home directory for GUI)
-if ! id photoframe >/dev/null 2>&1; then
-  useradd --system --home /var/lib/photoframe --shell /bin/bash --create-home photoframe
-fi
-
-# Add photoframe user to video group for display access
-usermod -a -G video photoframe
-
-# Set permissions
-chown -R photoframe:photoframe /var/lib/photoframe
-chown photoframe:photoframe /etc/photoframe/config.yaml
-
-# Enable and start backend service
-systemctl daemon-reload
-systemctl enable photoframe.service
-systemctl start photoframe.service
-
-# Check if we have a desktop environment for frontend
-if systemctl get-default | grep -q graphical; then
-  # Enable frontend service if we have a graphical target
-  if [ -f /opt/photoframe/photo-frame-frontend ]; then
-    systemctl enable photoframe-frontend.service
-    echo "Frontend service enabled. Will start on next graphical session."
-  fi
-else
-  echo "No graphical environment detected. Frontend service not enabled."
-fi
-
 echo ""
 echo "Digital Photo Frame installed!"
-echo "Backend: http://$(hostname -I | awk '{print $1}'):8080"
 echo ""
+echo "Backend binary: /opt/photoframe/digital-photo-frame-aarch64"
+echo "Frontend binary: /opt/photoframe/photo-frame-frontend"
+echo "Wrapper script: /usr/bin/digital-photo-frame"
 echo "Configuration: /etc/photoframe/config.yaml"
 echo ""
-if [ -f /opt/photoframe/photo-frame-frontend ]; then
-  echo "For fullscreen frontend, run: sudo /opt/photoframe/setup-display.sh"
-  echo "Then reboot to enable auto-login and fullscreen mode."
-else
-  echo "Frontend not available - using web interface only."
-fi
+echo "To run manually:"
+echo "  Backend: cd /etc/photoframe && /usr/bin/digital-photo-frame"
+echo "  Frontend: /opt/photoframe/photo-frame-frontend --fullscreen"
+echo ""
+echo "Web interface will be available at: http://localhost:8080"
