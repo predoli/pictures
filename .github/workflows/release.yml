@@ -52,6 +52,12 @@ jobs:
           
           # Add arm64 architecture for cross-compilation
           sudo dpkg --add-architecture arm64
+          
+          # Add ARM64 repository sources
+          echo "deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports jammy main restricted universe multiverse" | sudo tee -a /etc/apt/sources.list
+          echo "deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports jammy-updates main restricted universe multiverse" | sudo tee -a /etc/apt/sources.list
+          echo "deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports jammy-security main restricted universe multiverse" | sudo tee -a /etc/apt/sources.list
+          
           sudo apt-get update
           
           # Install cross-compilation toolchain
