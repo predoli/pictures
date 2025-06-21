@@ -10,19 +10,23 @@ on:
 
 jobs:
   build-go-backend:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       
-      - name: Set up Go
-        uses: actions/setup-go@v4
+      - name: Setup Go
+        uses: actions/setup-go@v5
         with:
-          go-version: '1.23'
+          go-version: '1.21.x'
+          
+      - name: Install dependencies
+        run: |
+          cd backend
+          go mod download
           
       - name: Build Go backend for ARM64
         run: |
           cd backend
-          go mod tidy
           GOOS=linux GOARCH=arm64 go build -ldflags="-s -w" -o ../digital-photo-frame-arm64 .
           
       - name: Upload Go binary
