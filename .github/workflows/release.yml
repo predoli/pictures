@@ -83,6 +83,11 @@ jobs:
           cargo clean
           rm -f Cargo.lock
 
+      - name: Check Tauri CLI version
+        run: |
+          cd frontend
+          npm run tauri --version || npx tauri --version
+
       - name: Build the app for ARM64
         uses: tauri-apps/tauri-action@v0
         env:
