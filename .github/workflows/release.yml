@@ -57,6 +57,10 @@ jobs:
       run: |
         cd frontend
         npm ci
+        # Clean cargo cache to avoid stale dependencies
+        cd src-tauri
+        cargo clean
+        cd ..
         npm run tauri build
         
         
