@@ -14,116 +14,98 @@ permissions:
 
 jobs:
   build-deb:
-    runs-on: ubuntu-24.04-arm
+    runs-on: ubuntu-22.04
     
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
       
-    - name: Set up Go
-      uses: actions/setup-go@v4
+    - name: Cache rust build artifacts
+      uses: Swatinem/rust-cache@v2
       with:
-        go-version: '1.23'
+        workspaces: frontend/src-tauri
+        cache-on-failure: true
         
-    - name: Set up Node.js
-      uses: actions/setup-node@v4
+    - name: Build ARM64 app using arm-runner
+      uses: pguyot/arm-runner-action@v2.6.5
       with:
-        node-version: '18'
-        
-    - name: Set up Rust
-      uses: dtolnay/rust-toolchain@stable
-        
-    - name: Install Tauri 1.5 dependencies
-      run: |
-        # Update package lists and fix any broken packages
-        sudo apt-get update --fix-missing
-        sudo apt-get install -f
-        
-        # Install essential build tools first
-        sudo apt-get install -y build-essential pkg-config libssl-dev
-        
-        # Install GUI dependencies with fallback strategy
-        sudo apt-get install -y --no-install-recommends \
-          libgtk-3-dev || sudo apt-get install -y libgtk-4-dev
+        base_image: https://dietpi.com/downloads/images/DietPi_RPi5-ARMv8-Bookworm.img.xz
+        cpu: cortex-a72
+        bind_mount_repository: true
+        image_additional_mb: 10240
+        optimize_image: no
+        commands: |
+          export HOME=/root
+          export CARGO_REGISTRIES_CRATES_IO_PROTOCOL=sparse
           
-        # Try webkit packages
-        sudo apt-get install -y \
-          libwebkit2gtk-4.1-dev || \
-          sudo apt-get install -y libwebkit2gtk-4.0-dev || \
-          echo "Warning: webkit not available"
+          apt-get update -y --allow-releaseinfo-change
+          apt-get autoremove -y
+          apt-get install -y --no-install-recommends --no-install-suggests \
+            curl libwebkit2gtk-4.1-dev build-essential libssl-dev \
+            libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev \
+            ruby ruby-dev rubygems pkg-config
+            
+          # Install Node.js
+          curl -fsSL https://deb.nodesource.com/setup_18.x | bash -
+          apt-get install -y nodejs
           
-        # Try soup packages (Tauri 1.5 needs libsoup-2.4)
-        sudo apt-get install -y \
-          libsoup2.4-dev || \
-          sudo apt-get install -y libsoup-2.4-dev || \
-          echo "Warning: libsoup-2.4 not available, trying workaround"
+          # Install Rust
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+          source ~/.cargo/env
           
-        # Try other GUI deps
-        sudo apt-get install -y \
-          libayatana-appindicator3-dev \
-          librsvg2-dev || echo "Warning: some GUI deps not available"
+          # Install FPM for packaging
+          gem install fpm
           
-        # If libsoup-2.4 is not available, try adding older repos
-        if ! pkg-config --exists libsoup-2.4; then
-          echo "Adding universe repository for older packages"
-          sudo add-apt-repository universe -y
-          sudo apt-get update
-          sudo apt-get install -y libsoup2.4-dev || echo "Still no libsoup-2.4"
-        fi
-        
-    - name: Install packaging tools
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y ruby ruby-dev rubygems build-essential
-        sudo gem install fpm
-        
-        
-    - name: Build Go backend
-      run: |
-        cd backend
-        go mod tidy
-        go build -ldflags="-s -w" -o ../digital-photo-frame-arm64 .
-        
-    - name: Build Tauri frontend
-      run: |
-        cd frontend
-        npm ci
-        npm run tauri build
-        
-        
-    - name: Prepare package structure
-      run: |
-        mkdir -p package-root/opt/photoframe
-        mkdir -p package-root/etc/photoframe
-        mkdir -p package-root/usr/bin
-        
-        # Copy Tauri frontend binary
-        cp frontend/src-tauri/target/release/photo-frame-frontend package-root/opt/photoframe/
-        
-        # Copy config template
-        cp backend/config.yaml.example package-root/etc/photoframe/config.yaml
-        
-        # Copy wrapper script
-        cp packaging/wrapper/digital-photo-frame package-root/usr/bin/
-        chmod +x package-root/usr/bin/digital-photo-frame
-        
-        
-    - name: Build Pi 64-bit package (ARM64)
-      run: |
-        # Copy ARM64 binary
-        cp digital-photo-frame-arm64 package-root/opt/photoframe/digital-photo-frame-aarch64
-        
-        VERSION=${GITHUB_REF#refs/tags/v}
-        echo "Building version: $VERSION"
-        fpm -s dir -t deb -n photoframe-pi64 -v "$VERSION" \
-          --architecture arm64 \
-          --depends "libc6" \
-          --description "Digital Photo Frame for Raspberry Pi 64-bit" \
-          --url "https://github.com/${{ github.repository }}" \
-          --maintainer "${{ github.actor }}" \
-          --license "MIT" \
-          -C package-root \
-          opt etc usr
+          # Build Go backend
+          cd backend
+          export GOOS=linux GOARCH=arm64
+          curl -L https://go.dev/dl/go1.23.linux-arm64.tar.gz | tar -xz -C /usr/local
+          export PATH=/usr/local/go/bin:$PATH
+          go mod tidy
+          go build -ldflags="-s -w" -o ../digital-photo-frame-arm64 .
+          cd ..
+          
+          # Build Tauri frontend
+          cd frontend
+          npm ci
+          npm run tauri build
+          cd ..
+          
+          # Create package structure
+          mkdir -p package-root/opt/photoframe
+          mkdir -p package-root/etc/photoframe
+          mkdir -p package-root/usr/bin
+          
+          # Copy Tauri frontend binary
+          cp frontend/src-tauri/target/release/photo-frame-frontend package-root/opt/photoframe/
+          
+          # Copy Go backend binary
+          cp digital-photo-frame-arm64 package-root/opt/photoframe/digital-photo-frame-aarch64
+          
+          # Copy config template
+          cp backend/config.yaml.example package-root/etc/photoframe/config.yaml
+          
+          # Copy wrapper script
+          cp packaging/wrapper/digital-photo-frame package-root/usr/bin/
+          chmod +x package-root/usr/bin/digital-photo-frame
+          
+          # Build Debian package
+          VERSION=${GITHUB_REF#refs/tags/v}
+          if [ -z "$VERSION" ] || [ "$VERSION" = "$GITHUB_REF" ]; then
+            VERSION="0.0.0-$(date +%Y%m%d%H%M%S)"
+          fi
+          echo "Building version: $VERSION"
+          
+          fpm -s dir -t deb -n photoframe-pi64 -v "$VERSION" \
+            --architecture arm64 \
+            --depends "libc6" \
+            --description "Digital Photo Frame for Raspberry Pi 64-bit" \
+            --url "https://github.com/$GITHUB_REPOSITORY" \
+            --maintainer "$GITHUB_ACTOR" \
+            --license "MIT" \
+            --after-install packaging/debian/postinst \
+            -C package-root \
+            opt etc usr
         
     - name: Upload packages
       uses: actions/upload-artifact@v4
