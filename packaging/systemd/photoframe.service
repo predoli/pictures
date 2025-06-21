@@ -1,5 +1,5 @@
 [Unit]
-Description=Digital Photo Frame
+Description=Digital Photo Frame Backend
 After=network.target
 Wants=network.target
 
@@ -7,19 +7,18 @@ Wants=network.target
 Type=simple
 User=photoframe
 Group=photoframe
-WorkingDirectory=/opt/photoframe
-ExecStart=/usr/bin/digital-photo-frame -config=/etc/photoframe/config.yaml
+WorkingDirectory=/etc/photoframe
+ExecStart=/usr/bin/digital-photo-frame
 Restart=always
 RestartSec=10
 StandardOutput=journal
 StandardError=journal
 
-# Security
+# Security (relaxed for compatibility)
 NoNewPrivileges=yes
-PrivateTmp=yes
-ProtectSystem=strict
-ProtectHome=yes
-ReadWritePaths=/var/lib/photoframe /var/log/photoframe
+PrivateTmp=no
+ProtectSystem=no
+ProtectHome=no
 
 [Install]
 WantedBy=multi-user.target

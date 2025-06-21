@@ -1,6 +1,8 @@
 #!/bin/bash
 set -e
 
-# Stop and disable service
-systemctl stop photoframe || true
-systemctl disable photoframe || true
+# Stop and disable services
+systemctl stop photoframe.service || true
+systemctl disable photoframe.service || true
+systemctl stop photoframe-frontend.service || true
+systemctl disable photoframe-frontend.service || true

@@ -68,12 +68,17 @@ jobs:
         # Copy config template
         cp backend/config.yaml.example package-root/etc/photoframe/config.yaml
         
-        # Copy systemd service
+        # Copy systemd services
         cp packaging/systemd/photoframe.service package-root/lib/systemd/system/
+        cp packaging/systemd/photoframe-frontend.service package-root/lib/systemd/system/
         
         # Copy wrapper script
         cp packaging/wrapper/digital-photo-frame package-root/usr/bin/
         chmod +x package-root/usr/bin/digital-photo-frame
+        
+        # Copy display setup script
+        cp packaging/scripts/setup-display.sh package-root/opt/photoframe/
+        chmod +x package-root/opt/photoframe/setup-display.sh
         
     - name: Copy package scripts
       run: |
@@ -84,6 +89,12 @@ jobs:
       run: |
         # Copy ARMv6 binary
         cp digital-photo-frame-armv6 package-root/opt/photoframe/digital-photo-frame-armv6l
+        
+        # Copy frontend binary if available
+        if [ -f release-binaries/photo-frame-arm-unknown-linux-gnueabihf ]; then
+          cp release-binaries/photo-frame-arm-unknown-linux-gnueabihf package-root/opt/photoframe/photo-frame-frontend
+          chmod +x package-root/opt/photoframe/photo-frame-frontend
+        fi
         
         VERSION=${GITHUB_REF#refs/tags/v}
         echo "Building version: $VERSION"
@@ -98,13 +109,20 @@ jobs:
           --before-remove scripts/prerm \
           --after-remove scripts/postrm \
           --deb-systemd package-root/lib/systemd/system/photoframe.service \
+          --deb-systemd package-root/lib/systemd/system/photoframe-frontend.service \
           -C package-root \
-          opt etc var usr
+          opt etc var usr lib
           
     - name: Build Pi 3/4 package (ARMv7)
       run: |
         # Copy ARMv7 binary
         cp digital-photo-frame-armv7 package-root/opt/photoframe/digital-photo-frame-armv7l
+        
+        # Copy frontend binary if available
+        if [ -f release-binaries/photo-frame-armv7-unknown-linux-gnueabihf ]; then
+          cp release-binaries/photo-frame-armv7-unknown-linux-gnueabihf package-root/opt/photoframe/photo-frame-frontend
+          chmod +x package-root/opt/photoframe/photo-frame-frontend
+        fi
         
         VERSION=${GITHUB_REF#refs/tags/v}
         fpm -s dir -t deb -n photoframe-pi -v "$VERSION" \
@@ -118,13 +136,20 @@ jobs:
           --before-remove scripts/prerm \
           --after-remove scripts/postrm \
           --deb-systemd package-root/lib/systemd/system/photoframe.service \
+          --deb-systemd package-root/lib/systemd/system/photoframe-frontend.service \
           -C package-root \
-          opt etc var usr
+          opt etc var usr lib
           
     - name: Build Pi 64-bit package (ARM64)
       run: |
         # Copy ARM64 binary
         cp digital-photo-frame-arm64 package-root/opt/photoframe/digital-photo-frame-aarch64
+        
+        # Copy frontend binary if available
+        if [ -f release-binaries/photo-frame-aarch64-unknown-linux-gnu ]; then
+          cp release-binaries/photo-frame-aarch64-unknown-linux-gnu package-root/opt/photoframe/photo-frame-frontend
+          chmod +x package-root/opt/photoframe/photo-frame-frontend
+        fi
         
         VERSION=${GITHUB_REF#refs/tags/v}
         fpm -s dir -t deb -n photoframe-pi64 -v "$VERSION" \
@@ -138,8 +163,9 @@ jobs:
           --before-remove scripts/prerm \
           --after-remove scripts/postrm \
           --deb-systemd package-root/lib/systemd/system/photoframe.service \
+          --deb-systemd package-root/lib/systemd/system/photoframe-frontend.service \
           -C package-root \
-          opt etc var usr
+          opt etc var usr lib
         
     - name: Upload packages
       uses: actions/upload-artifact@v4
