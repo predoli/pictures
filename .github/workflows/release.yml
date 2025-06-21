@@ -46,6 +46,7 @@ jobs:
           librsvg2-dev \
           libsoup2.4-dev \
           libssl-dev \
+          libjavascriptcoregtk-4.1-dev \
           pkg-config
         
     - name: Build Go backend
