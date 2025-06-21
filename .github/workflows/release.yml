@@ -59,7 +59,7 @@ jobs:
         mkdir -p package-root/opt/photoframe
         mkdir -p package-root/etc/photoframe
         mkdir -p package-root/var/lib/photoframe/images
-        mkdir -p package-root/usr/lib/systemd/system
+        mkdir -p package-root/lib/systemd/system
         mkdir -p package-root/usr/bin
         
         # Copy web frontend
@@ -69,7 +69,7 @@ jobs:
         cp backend/config.yaml.example package-root/etc/photoframe/config.yaml
         
         # Copy systemd service
-        cp packaging/systemd/photoframe.service package-root/usr/lib/systemd/system/
+        cp packaging/systemd/photoframe.service package-root/lib/systemd/system/
         
         # Copy wrapper script
         cp packaging/wrapper/digital-photo-frame package-root/usr/bin/
@@ -97,7 +97,7 @@ jobs:
           --after-install scripts/postinst \
           --before-remove scripts/prerm \
           --after-remove scripts/postrm \
-          --deb-systemd package-root/usr/lib/systemd/system/photoframe.service \
+          --deb-systemd package-root/lib/systemd/system/photoframe.service \
           -C package-root \
           opt etc var usr
           
@@ -117,7 +117,7 @@ jobs:
           --after-install scripts/postinst \
           --before-remove scripts/prerm \
           --after-remove scripts/postrm \
-          --deb-systemd package-root/usr/lib/systemd/system/photoframe.service \
+          --deb-systemd package-root/lib/systemd/system/photoframe.service \
           -C package-root \
           opt etc var usr
           
@@ -137,7 +137,7 @@ jobs:
           --after-install scripts/postinst \
           --before-remove scripts/prerm \
           --after-remove scripts/postrm \
-          --deb-systemd package-root/usr/lib/systemd/system/photoframe.service \
+          --deb-systemd package-root/lib/systemd/system/photoframe.service \
           -C package-root \
           opt etc var usr
         
