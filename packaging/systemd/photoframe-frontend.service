@@ -1,0 +1,26 @@
+[Unit]
+Description=Digital Photo Frame Frontend (Fullscreen)
+After=photoframe.service graphical-session.target
+Wants=photoframe.service
+Requires=graphical-session.target
+
+[Service]
+Type=simple
+User=photoframe
+Group=photoframe
+WorkingDirectory=/opt/photoframe
+Environment=DISPLAY=:0
+Environment=WAYLAND_DISPLAY=wayland-0
+ExecStartPre=/bin/sleep 5
+ExecStart=/opt/photoframe/photo-frame-frontend --fullscreen
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+# Security (relaxed for GUI)
+NoNewPrivileges=yes
+PrivateTmp=yes
+
+[Install]
+WantedBy=graphical-session.target
