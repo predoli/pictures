@@ -8,104 +8,123 @@ on:
       - 'v*'
   workflow_dispatch:
 
-permissions:
-  contents: write
-  packages: write
-
 jobs:
-  build-arm64:
+  build-go-backend:
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
       
-      - name: Build ARM64 app using arm-runner
-        uses: pguyot/arm-runner-action@v2.6.5
+      - name: Set up Go
+        uses: actions/setup-go@v4
         with:
-          base_image: https://dietpi.com/downloads/images/DietPi_RPi5-ARMv8-Bookworm.img.xz
-          cpu: cortex-a72
-          bind_mount_repository: true
-          image_additional_mb: 10240
-          optimize_image: no
-          commands: |
-            # Install dependencies
-            apt-get update -y --allow-releaseinfo-change
-            apt-get install -y curl build-essential libssl-dev pkg-config \
-              libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev \
-              librsvg2-dev ruby ruby-dev rubygems
+          go-version: '1.23'
+          
+      - name: Build Go backend for ARM64
+        run: |
+          cd backend
+          go mod tidy
+          GOOS=linux GOARCH=arm64 go build -ldflags="-s -w" -o ../digital-photo-frame-arm64 .
+          
+      - name: Upload Go binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: go-backend-arm64
+          path: digital-photo-frame-arm64
+
+  publish-tauri:
+    permissions:
+      contents: write
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: setup node
+        uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+
+      - name: install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-unknown-linux-gnu
+
+      - name: install dependencies (ubuntu only)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.0-dev libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+          sudo apt-get install -y gcc-aarch64-linux-gnu
+
+      - name: install frontend dependencies
+        run: |
+          cd frontend
+          npm install
+
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CC_aarch64_unknown_linux_gnu: aarch64-linux-gnu-gcc
+          CXX_aarch64_unknown_linux_gnu: aarch64-linux-gnu-g++
+          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
+        with:
+          projectPath: frontend
+          tagName: app-v__VERSION__
+          releaseName: "Digital Photo Frame v__VERSION__"
+          releaseBody: "See the assets to download this version and install."
+          releaseDraft: true
+          prerelease: false
+          args: --target aarch64-unknown-linux-gnu
+
+  create-debian-package:
+    runs-on: ubuntu-22.04
+    needs: [build-go-backend, publish-tauri]
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Download Go backend
+        uses: actions/download-artifact@v4
+        with:
+          name: go-backend-arm64
+          
+      - name: Install packaging tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ruby ruby-dev rubygems build-essential
+          sudo gem install fpm
+          
+      - name: Create Debian package
+        run: |
+          # Create package structure
+          mkdir -p package-root/opt/photoframe
+          mkdir -p package-root/etc/photoframe
+          mkdir -p package-root/usr/bin
+          
+          # Copy Go backend binary
+          cp digital-photo-frame-arm64 package-root/opt/photoframe/digital-photo-frame-aarch64
+          
+          # Copy config and wrapper
+          cp backend/config.yaml.example package-root/etc/photoframe/config.yaml
+          cp packaging/wrapper/digital-photo-frame package-root/usr/bin/
+          chmod +x package-root/usr/bin/digital-photo-frame
+          
+          # Build Debian package
+          VERSION=${GITHUB_REF#refs/tags/v}
+          if [ -z "$VERSION" ] || [ "$VERSION" = "$GITHUB_REF" ]; then
+            VERSION="0.0.0-$(date +%Y%m%d%H%M%S)"
+          fi
+          
+          fpm -s dir -t deb -n photoframe-pi64 -v "$VERSION" \
+            --architecture arm64 \
+            --depends "libc6" \
+            --description "Digital Photo Frame for Raspberry Pi 64-bit" \
+            --url "https://github.com/${{ github.repository }}" \
+            --maintainer "${{ github.actor }}" \
+            --license "MIT" \
+            --after-install packaging/debian/postinst \
+            -C package-root \
+            opt etc usr
             
-            # Install Node.js
-            curl -fsSL https://deb.nodesource.com/setup_18.x | bash -
-            apt-get install -y nodejs
-            
-            # Install Rust
-            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-            . ~/.cargo/env
-            
-            # Install Go
-            curl -L https://go.dev/dl/go1.23.linux-arm64.tar.gz | tar -xz -C /usr/local
-            export PATH=/usr/local/go/bin:$PATH
-            
-            # Install FPM
-            gem install fpm
-            
-            # Build Go backend
-            cd backend
-            go mod tidy
-            go build -ldflags="-s -w" -o ../digital-photo-frame-arm64 .
-            cd ..
-            
-            # Build Tauri frontend
-            cd frontend
-            npm ci
-            npm run tauri build
-            cd ..
-            
-            # Create package
-            mkdir -p package-root/opt/photoframe package-root/etc/photoframe package-root/usr/bin
-            cp frontend/src-tauri/target/release/photo-frame package-root/opt/photoframe/photo-frame-frontend
-            cp digital-photo-frame-arm64 package-root/opt/photoframe/digital-photo-frame-aarch64
-            cp backend/config.yaml.example package-root/etc/photoframe/config.yaml
-            cp packaging/wrapper/digital-photo-frame package-root/usr/bin/
-            chmod +x package-root/usr/bin/digital-photo-frame
-            
-            # Build Debian package
-            VERSION=$(date +%Y%m%d%H%M%S)
-            fpm -s dir -t deb -n photoframe-pi64 -v "$VERSION" \
-              --architecture arm64 \
-              --depends "libc6" \
-              --description "Digital Photo Frame for Raspberry Pi 64-bit" \
-              --maintainer "CI Build" \
-              --license "MIT" \
-              --after-install packaging/debian/postinst \
-              -C package-root \
-              opt etc usr
       - name: Upload Debian package
         uses: actions/upload-artifact@v4
         with:
           name: debian-package
           path: "*.deb"
-          
-      - name: Create Release
-        if: startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@v1
-        with:
-          files: "*.deb"
-          body: |
-            ## Digital Photo Frame - ARM64
-            
-            ### Installation
-            ```bash
-            wget photoframe-pi64_*.deb
-            sudo apt install ./photoframe-pi64_*.deb
-            ```
-            
-            ### Usage
-            ```bash
-            # Run backend
-            cd /etc/photoframe && digital-photo-frame
-            
-            # Run frontend
-            /opt/photoframe/photo-frame-frontend --fullscreen
-            ```
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
