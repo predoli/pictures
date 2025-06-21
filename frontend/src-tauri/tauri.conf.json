@@ -1,28 +1,19 @@
 {
-  "$schema": "https://schema.tauri.app/config/2.0.0",
-  "build": {
-    "beforeDevCommand": "npm run dev", 
-    "beforeBuildCommand": "npm run build",
-    "devUrl": "http://localhost:1420",
-    "frontendDist": "../dist"
-  },
-  "bundle": {
-    "active": false
-  },
   "productName": "Digital Photo Frame",
   "version": "0.0.0",
   "identifier": "com.photoframe.dev",
-  "plugins": {
-    "shell": {
-      "open": true
-    }
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build",
+    "devUrl": "http://localhost:1420",
+    "frontendDist": "../dist"
   },
   "app": {
     "windows": [
       {
         "fullscreen": false,
         "resizable": true,
-        "title": "Digital Photo Frame", 
+        "title": "Digital Photo Frame",
         "width": 1200,
         "height": 800,
         "minWidth": 800,
@@ -31,6 +22,14 @@
     ],
     "security": {
       "csp": null
+    }
+  },
+  "bundle": {
+    "active": false
+  },
+  "plugins": {
+    "shell": {
+      "open": true
     }
   }
 }
