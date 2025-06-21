@@ -28,33 +28,18 @@ jobs:
       with:
         node-version: '18'
         
-    - name: Install Rust
-      uses: dtolnay/rust-toolchain@stable
-      
-    - name: Add Rust ARM targets
-      run: |
-        rustup target add arm-unknown-linux-gnueabihf
-        rustup target add armv7-unknown-linux-gnueabihf  
-        rustup target add aarch64-unknown-linux-gnu
-        
     - name: Install packaging tools
       run: |
         sudo apt-get update
         sudo apt-get install -y ruby ruby-dev rubygems build-essential
         sudo gem install fpm
         
-    - name: Build Go backend for ARM targets
+    - name: Build Go backend for ARM64
       run: |
         cd backend
         go mod tidy
         
-        # Pi Zero (ARMv6)
-        GOOS=linux GOARCH=arm GOARM=6 go build -ldflags="-s -w" -o ../digital-photo-frame-armv6 .
-        
-        # Pi 3/4 (ARMv7)  
-        GOOS=linux GOARCH=arm GOARM=7 go build -ldflags="-s -w" -o ../digital-photo-frame-armv7 .
-        
-        # Pi 64-bit (ARM64)
+        # Pi 64-bit (ARM64) only
         GOOS=linux GOARCH=arm64 go build -ldflags="-s -w" -o ../digital-photo-frame-arm64 .
         
     - name: Build web frontend
@@ -63,40 +48,6 @@ jobs:
         npm ci
         npm run build
         
-    - name: Build Tauri frontend for ARM targets (best effort)
-      run: |
-        cd frontend
-        
-        echo "Attempting Tauri builds for ARM targets..."
-        
-        # Pi Zero/1 (ARM)
-        echo "Building for ARM (Pi Zero)..."
-        npm run tauri build -- --target arm-unknown-linux-gnueabihf || echo "ARM build failed, continuing..."
-        
-        # Pi 3/4 (ARMv7)
-        echo "Building for ARMv7 (Pi 3/4)..."
-        npm run tauri build -- --target armv7-unknown-linux-gnueabihf || echo "ARMv7 build failed, continuing..."
-        
-        # Pi 64-bit (ARM64)
-        echo "Building for ARM64 (Pi 64-bit)..."
-        npm run tauri build -- --target aarch64-unknown-linux-gnu || echo "ARM64 build failed, continuing..."
-        
-        # Debug: Show what was built
-        echo "Tauri build results:"
-        find src-tauri/target -name "photo-frame" -type f 2>/dev/null | head -10 || echo "No binaries found"
-        
-        # Copy any successful builds
-        mkdir -p ../release-binaries
-        find src-tauri/target -name "photo-frame" -type f 2>/dev/null | while read binary; do
-          echo "Found binary: $binary"
-          target_dir=$(echo $binary | cut -d'/' -f3)
-          echo "Copying to: ../release-binaries/photo-frame-$target_dir"
-          cp "$binary" "../release-binaries/photo-frame-$target_dir" || true
-        done
-        
-        # Show what we copied
-        echo "Release binaries:"
-        ls -la ../release-binaries/ | grep photo-frame || echo "No photo-frame binaries copied"
         
     - name: Prepare package structure
       run: |
@@ -129,69 +80,13 @@ jobs:
         mkdir -p scripts
         cp packaging/debian/* scripts/
         
-    - name: Build Pi Zero package (ARMv6)
-      run: |
-        # Copy ARMv6 binary
-        cp digital-photo-frame-armv6 package-root/opt/photoframe/digital-photo-frame-armv6l
-        
-        # Copy frontend binary if available
-        if [ -f release-binaries/photo-frame-arm-unknown-linux-gnueabihf ]; then
-          cp release-binaries/photo-frame-arm-unknown-linux-gnueabihf package-root/opt/photoframe/photo-frame-frontend
-          chmod +x package-root/opt/photoframe/photo-frame-frontend
-        fi
-        
-        VERSION=${GITHUB_REF#refs/tags/v}
-        echo "Building version: $VERSION"
-        fpm -s dir -t deb -n photoframe-pi-zero -v "$VERSION" \
-          --architecture armhf \
-          --depends "libc6" \
-          --description "Digital Photo Frame for Raspberry Pi Zero" \
-          --url "https://github.com/${{ github.repository }}" \
-          --maintainer "${{ github.actor }}" \
-          --license "MIT" \
-          --after-install scripts/postinst \
-          --before-remove scripts/prerm \
-          --after-remove scripts/postrm \
-          -C package-root \
-          opt etc var usr lib
-          
-    - name: Build Pi 3/4 package (ARMv7)
-      run: |
-        # Copy ARMv7 binary
-        cp digital-photo-frame-armv7 package-root/opt/photoframe/digital-photo-frame-armv7l
-        
-        # Copy frontend binary if available
-        if [ -f release-binaries/photo-frame-armv7-unknown-linux-gnueabihf ]; then
-          cp release-binaries/photo-frame-armv7-unknown-linux-gnueabihf package-root/opt/photoframe/photo-frame-frontend
-          chmod +x package-root/opt/photoframe/photo-frame-frontend
-        fi
-        
-        VERSION=${GITHUB_REF#refs/tags/v}
-        fpm -s dir -t deb -n photoframe-pi -v "$VERSION" \
-          --architecture armhf \
-          --depends "libc6" \
-          --description "Digital Photo Frame for Raspberry Pi 3/4" \
-          --url "https://github.com/${{ github.repository }}" \
-          --maintainer "${{ github.actor }}" \
-          --license "MIT" \
-          --after-install scripts/postinst \
-          --before-remove scripts/prerm \
-          --after-remove scripts/postrm \
-          -C package-root \
-          opt etc var usr lib
-          
     - name: Build Pi 64-bit package (ARM64)
       run: |
         # Copy ARM64 binary
         cp digital-photo-frame-arm64 package-root/opt/photoframe/digital-photo-frame-aarch64
         
-        # Copy frontend binary if available
-        if [ -f release-binaries/photo-frame-aarch64-unknown-linux-gnu ]; then
-          cp release-binaries/photo-frame-aarch64-unknown-linux-gnu package-root/opt/photoframe/photo-frame-frontend
-          chmod +x package-root/opt/photoframe/photo-frame-frontend
-        fi
-        
         VERSION=${GITHUB_REF#refs/tags/v}
+        echo "Building version: $VERSION"
         fpm -s dir -t deb -n photoframe-pi64 -v "$VERSION" \
           --architecture arm64 \
           --depends "libc6" \
@@ -217,33 +112,37 @@ jobs:
       with:
         files: "*.deb"
         body: |
-          ## Debian Packages
+          ## Digital Photo Frame - ARM64 Only
+          
+          Simplified release for Raspberry Pi 64-bit OS.
           
           ### Installation
           ```bash
-          # Pi Zero
-          wget photoframe-pi-zero_*.deb
-          sudo apt install ./photoframe-pi-zero_*.deb
-          
-          # Pi 3/4
-          wget photoframe-pi_*.deb  
-          sudo apt install ./photoframe-pi_*.deb
-          
-          # Pi 64-bit
+          # Download and install
           wget photoframe-pi64_*.deb
           sudo apt install ./photoframe-pi64_*.deb
           ```
           
           ### Configuration
-          Edit `/etc/photoframe/config.yaml` then restart:
           ```bash
+          # Edit config
+          sudo nano /etc/photoframe/config.yaml
+          
+          # Restart service
           sudo systemctl restart photoframe
           ```
           
-          ### Management
+          ### Optional Kiosk Mode
           ```bash
-          sudo systemctl start/stop/restart photoframe
-          sudo journalctl -u photoframe -f
+          # Install browser
+          sudo apt install chromium-browser
+          
+          # Setup fullscreen
+          sudo /opt/photoframe/setup-display.sh
+          sudo reboot
           ```
+          
+          ### Access
+          Web interface: `http://your-pi-ip:8080`
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
