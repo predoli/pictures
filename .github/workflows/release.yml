@@ -40,13 +40,13 @@ jobs:
     - name: Install Tauri dependencies
       run: |
         sudo apt-get install -y \
-          libwebkit2gtk-4.1-dev \
+          libwebkit2gtk-4.0-dev \
           libgtk-3-dev \
           libayatana-appindicator3-dev \
           librsvg2-dev \
           libsoup2.4-dev \
           libssl-dev \
-          libjavascriptcoregtk-4.1-dev \
+          libjavascriptcoregtk-4.0-dev \
           pkg-config
         
     - name: Build Go backend
