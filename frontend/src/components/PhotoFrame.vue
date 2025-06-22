@@ -152,7 +152,11 @@ const handleImageError = (index: number) => {
 };
 
 const getImageUrl = (image: any) => {
-  // Use HTTP URL from backend (static file serving)
+  // When running from file:// protocol, use direct file access
+  if (window.location.protocol === 'file:') {
+    return `file://${image.file_path}`;
+  }
+  // When running from HTTP server, use backend URL
   return `http://localhost:8080${image.url}`;
 };
 </script>
