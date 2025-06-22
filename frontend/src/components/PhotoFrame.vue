@@ -12,7 +12,7 @@
       </div>
 
       <!-- Image slides -->
-      <div v-else-if="images.length > 0" class="slides" @click="handleImageClick" @touchstart="handleTouchStart" @touchend="handleTouchEnd">
+      <div v-else-if="images.length > 0" class="slides" @click="handleImageClick">
         <div
           v-for="(image, index) in images"
           :key="image.filename"
@@ -98,7 +98,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, onMounted } from 'vue';
+import { computed, ref } from 'vue';
 import { usePhotoFrame } from '../composables/usePhotoFrame';
 
 const {
@@ -132,51 +132,25 @@ const handleKeydown = (event: KeyboardEvent) => {
   }
 };
 
-const handleImageClick = () => {
-  // For non-touch devices (mouse), advance image directly
-  if (!isTouchDevice.value) {
-    nextImage();
-  }
-};
-
-// Touch/hover state management
-const isTouchDevice = ref(false);
+// Simple click-based control visibility for Pi touchscreen (mouse emulation)
 const showControls = ref(false);
 let hideControlsTimeout: number | null = null;
 
-// Detect if device supports touch
-onMounted(() => {
-  isTouchDevice.value = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
-});
-
-const showControlsTemporarily = () => {
-  showControls.value = true;
-  
-  // Clear existing timeout
-  if (hideControlsTimeout) {
-    clearTimeout(hideControlsTimeout);
-  }
-  
-  // Auto-hide after 4 seconds on touch devices
-  if (isTouchDevice.value) {
+const handleImageClick = () => {
+  // First click shows controls, second click advances image
+  if (!showControls.value) {
+    showControls.value = true;
+    
+    // Clear existing timeout
+    if (hideControlsTimeout) {
+      clearTimeout(hideControlsTimeout);
+    }
+    
+    // Auto-hide after 3 seconds
     hideControlsTimeout = window.setTimeout(() => {
       showControls.value = false;
-    }, 4000);
-  }
-};
-
-const handleTouchStart = (event: TouchEvent) => {
-  // Show controls on touch start
-  if (isTouchDevice.value && !showControls.value) {
-    event.preventDefault();
-    showControlsTemporarily();
-  }
-};
-
-const handleTouchEnd = (event: TouchEvent) => {
-  // Only advance image if controls are already visible
-  if (isTouchDevice.value && showControls.value) {
-    event.preventDefault();
+    }, 3000);
+  } else {
     nextImage();
   }
 };
@@ -280,14 +254,7 @@ const getImageUrl = (image: any) => {
   transition: opacity 0.3s ease;
 }
 
-/* Show on hover for desktop devices */
-@media (hover: hover) {
-  .photo-frame:hover .image-info {
-    opacity: 1;
-  }
-}
-
-/* Show with visible class for touch devices */
+/* Only show with visible class - no hover on Pi touchscreen */
 .image-info.visible {
   opacity: 1;
 }
@@ -308,14 +275,7 @@ const getImageUrl = (image: any) => {
   backdrop-filter: blur(10px);
 }
 
-/* Show on hover for desktop devices */
-@media (hover: hover) {
-  .photo-frame:hover .controls {
-    opacity: 1;
-  }
-}
-
-/* Show with visible class for touch devices */
+/* Only show with visible class - no hover on Pi touchscreen */
 .controls.visible {
   opacity: 1;
 }
