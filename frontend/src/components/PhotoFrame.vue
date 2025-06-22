@@ -12,7 +12,7 @@
       </div>
 
       <!-- Image slides -->
-      <div v-else-if="images.length > 0" class="slides" @click="handleImageClick" @touchend="handleTouchEnd">
+      <div v-else-if="images.length > 0" class="slides" @click="handleImageClick" @touchstart="handleTouchStart" @touchend="handleTouchEnd">
         <div
           v-for="(image, index) in images"
           :key="image.filename"
@@ -98,7 +98,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, ref, onMounted } from 'vue';
 import { usePhotoFrame } from '../composables/usePhotoFrame';
 
 const {
@@ -133,16 +133,21 @@ const handleKeydown = (event: KeyboardEvent) => {
 };
 
 const handleImageClick = () => {
-  // For mouse users, show controls briefly on click
-  if (!showControls.value) {
-    showControlsTemporarily();
-  } else {
+  // For non-touch devices (mouse), advance image directly
+  if (!isTouchDevice.value) {
     nextImage();
   }
 };
 
+// Touch/hover state management
+const isTouchDevice = ref(false);
 const showControls = ref(false);
 let hideControlsTimeout: number | null = null;
+
+// Detect if device supports touch
+onMounted(() => {
+  isTouchDevice.value = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+});
 
 const showControlsTemporarily = () => {
   showControls.value = true;
@@ -152,19 +157,26 @@ const showControlsTemporarily = () => {
     clearTimeout(hideControlsTimeout);
   }
   
-  // Hide controls after 3 seconds
-  hideControlsTimeout = window.setTimeout(() => {
-    showControls.value = false;
-  }, 3000);
+  // Auto-hide after 4 seconds on touch devices
+  if (isTouchDevice.value) {
+    hideControlsTimeout = window.setTimeout(() => {
+      showControls.value = false;
+    }, 4000);
+  }
+};
+
+const handleTouchStart = (event: TouchEvent) => {
+  // Show controls on touch start
+  if (isTouchDevice.value && !showControls.value) {
+    event.preventDefault();
+    showControlsTemporarily();
+  }
 };
 
 const handleTouchEnd = (event: TouchEvent) => {
-  event.preventDefault();
-  
-  // First touch shows controls, second touch advances image
-  if (!showControls.value) {
-    showControlsTemporarily();
-  } else {
+  // Only advance image if controls are already visible
+  if (isTouchDevice.value && showControls.value) {
+    event.preventDefault();
     nextImage();
   }
 };
@@ -268,7 +280,14 @@ const getImageUrl = (image: any) => {
   transition: opacity 0.3s ease;
 }
 
-.photo-frame:hover .image-info,
+/* Show on hover for desktop devices */
+@media (hover: hover) {
+  .photo-frame:hover .image-info {
+    opacity: 1;
+  }
+}
+
+/* Show with visible class for touch devices */
 .image-info.visible {
   opacity: 1;
 }
@@ -289,7 +308,14 @@ const getImageUrl = (image: any) => {
   backdrop-filter: blur(10px);
 }
 
-.photo-frame:hover .controls,
+/* Show on hover for desktop devices */
+@media (hover: hover) {
+  .photo-frame:hover .controls {
+    opacity: 1;
+  }
+}
+
+/* Show with visible class for touch devices */
 .controls.visible {
   opacity: 1;
 }
