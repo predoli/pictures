@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"log"
+	"math/rand"
 	"mime"
 	"net/http"
 	"os"
@@ -137,8 +138,11 @@ func sortImages(images []Image, ordering string) {
 			return images[i].ModifiedDate.After(images[j].ModifiedDate)
 		})
 	case "random":
-		// For random, we'll just return as-is for now
-		// TODO: Implement proper random shuffling
+		// Shuffle the slice randomly
+		for i := len(images) - 1; i > 0; i-- {
+			j := rand.Intn(i + 1)
+			images[i], images[j] = images[j], images[i]
+		}
 	}
 }
 

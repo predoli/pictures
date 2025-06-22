@@ -35,13 +35,13 @@
     </div>
 
     <!-- Image info -->
-    <div v-if="currentImage" class="image-info">
+    <div v-if="currentImage" :class="['image-info', { visible: showControls }]">
       <div class="image-name">{{ currentImage.filename }}</div>
       <div class="image-index">{{ currentIndex + 1 }} of {{ totalCount }}</div>
     </div>
 
     <!-- Controls -->
-    <div class="controls">
+    <div :class="['controls', { visible: showControls }]">
       <button @click="togglePause" class="btn btn-outline-light me-3">
         <i :class="isPaused ? 'bi bi-play-fill' : 'bi bi-pause-fill'"></i>
         {{ isPaused ? 'Play' : 'Pause' }}
@@ -98,7 +98,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import { usePhotoFrame } from '../composables/usePhotoFrame';
 
 const {
@@ -133,12 +133,40 @@ const handleKeydown = (event: KeyboardEvent) => {
 };
 
 const handleImageClick = () => {
-  nextImage();
+  // For mouse users, show controls briefly on click
+  if (!showControls.value) {
+    showControlsTemporarily();
+  } else {
+    nextImage();
+  }
+};
+
+const showControls = ref(false);
+let hideControlsTimeout: number | null = null;
+
+const showControlsTemporarily = () => {
+  showControls.value = true;
+  
+  // Clear existing timeout
+  if (hideControlsTimeout) {
+    clearTimeout(hideControlsTimeout);
+  }
+  
+  // Hide controls after 3 seconds
+  hideControlsTimeout = window.setTimeout(() => {
+    showControls.value = false;
+  }, 3000);
 };
 
 const handleTouchEnd = (event: TouchEvent) => {
   event.preventDefault();
-  nextImage();
+  
+  // First touch shows controls, second touch advances image
+  if (!showControls.value) {
+    showControlsTemporarily();
+  } else {
+    nextImage();
+  }
 };
 
 const handleImageLoad = () => {
@@ -240,7 +268,8 @@ const getImageUrl = (image: any) => {
   transition: opacity 0.3s ease;
 }
 
-.photo-frame:hover .image-info {
+.photo-frame:hover .image-info,
+.image-info.visible {
   opacity: 1;
 }
 
@@ -260,7 +289,8 @@ const getImageUrl = (image: any) => {
   backdrop-filter: blur(10px);
 }
 
-.photo-frame:hover .controls {
+.photo-frame:hover .controls,
+.controls.visible {
   opacity: 1;
 }
 
