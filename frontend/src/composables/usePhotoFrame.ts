@@ -3,7 +3,7 @@ import type { Image, ImagesResponse, OrderingMode } from '../types';
 import { cookieUtils } from '../utils/cookies';
 
 const API_BASE = 'http://localhost:8080';
-const SLIDE_INTERVAL = 15000; // 15 seconds
+const SLIDE_INTERVAL = 30000; // 15 seconds
 const IMAGES_PER_BATCH = 10;
 const PRELOAD_AHEAD_COUNT = 5; // Number of images to preload ahead
 
