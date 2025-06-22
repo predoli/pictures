@@ -21,7 +21,7 @@
           <img
             :src="getImageUrl(image)"
             :alt="image.filename"
-            @load="handleImageLoad(index)"
+            @load="handleImageLoad"
             @error="handleImageError(index)"
             loading="lazy"
           />
@@ -142,7 +142,7 @@ const handleTouchEnd = (event: TouchEvent) => {
   nextImage();
 };
 
-const handleImageLoad = (index: number) => {
+const handleImageLoad = () => {
   // Image loaded successfully - could add any success handling here
 };
 
