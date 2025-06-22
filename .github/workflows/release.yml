@@ -59,7 +59,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: frontend-dist
-          path: frontend/dist/
+          path: frontend/dist/*
 
   create-debian-package:
     runs-on: ubuntu-latest
@@ -80,6 +80,12 @@ jobs:
           
       - name: Create Debian package
         run: |
+          # Debug: List available files
+          echo "Available files in workspace:"
+          ls -la
+          echo "Checking for frontend files..."
+          find . -name "*.html" -o -name "*.js" -o -name "*.css" | head -10
+          
           # Create package structure
           mkdir -p package-root/opt/photoframe/frontend
           mkdir -p package-root/etc/photoframe
@@ -89,8 +95,26 @@ jobs:
           # Copy Go backend binary
           cp digital-photo-frame-arm64 package-root/opt/photoframe/digital-photo-frame-aarch64
           
-          # Copy Vue.js frontend files
-          cp -r dist/* package-root/opt/photoframe/frontend/
+          # Copy Vue.js frontend files  
+          # The frontend artifacts should include index.html and assets
+          echo "Looking for frontend files..."
+          if [ -f "index.html" ]; then
+            echo "Found index.html, copying frontend files"
+            # Copy all web files to frontend directory
+            for file in index.html *.js *.css *.png *.ico *.svg *.woff *.woff2; do
+              [ -e "$file" ] && cp "$file" package-root/opt/photoframe/frontend/
+            done
+            # Copy assets directory if it exists
+            [ -d "assets" ] && cp -r assets package-root/opt/photoframe/frontend/
+            echo "Frontend files copied successfully"
+          else
+            echo "ERROR: index.html not found in downloaded artifacts!"
+            echo "Available files:"
+            ls -la
+            echo "Checking for any HTML files:"
+            find . -name "*.html" -type f
+            exit 1
+          fi
           
           # Copy config
           cp backend/config.yaml.example package-root/etc/photoframe/config.yaml
