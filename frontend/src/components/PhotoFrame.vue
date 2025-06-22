@@ -99,7 +99,6 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import { convertFileSrc } from '@tauri-apps/api/core';
 import { usePhotoFrame } from '../composables/usePhotoFrame';
 
 const {
@@ -153,11 +152,7 @@ const handleImageError = (index: number) => {
 };
 
 const getImageUrl = (image: any) => {
-  // Use the absolute file path from the backend with convertFileSrc
-  if (image.file_path) {
-    return convertFileSrc(image.file_path);
-  }
-  // Fallback to HTTP URL
+  // Use HTTP URL from backend (static file serving)
   return `http://localhost:8080${image.url}`;
 };
 </script>

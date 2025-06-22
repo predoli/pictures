@@ -35,8 +35,8 @@ jobs:
           name: go-backend-arm64
           path: digital-photo-frame-arm64
 
-  build-arm64-tauri:
-    runs-on: ubuntu-22.04-arm
+  build-frontend:
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
@@ -45,33 +45,25 @@ jobs:
         with:
           node-version: lts/*
 
-      - name: install Rust stable
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: install dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev patchelf
-
       - name: install frontend dependencies
         run: |
           cd frontend
           npm install
 
-      - name: build tauri app
+      - name: build Vue.js frontend
         run: |
           cd frontend
-          npm run tauri build
+          npm run build
             
-      - name: Upload Tauri binary
+      - name: Upload frontend dist
         uses: actions/upload-artifact@v4
         with:
-          name: tauri-frontend-arm64
-          path: frontend/src-tauri/target/release/photo-frame
+          name: frontend-dist
+          path: frontend/dist/
 
   create-debian-package:
     runs-on: ubuntu-latest
-    needs: [build-go-backend, build-arm64-tauri]
+    needs: [build-go-backend, build-frontend]
     steps:
       - uses: actions/checkout@v4
       
@@ -89,21 +81,28 @@ jobs:
       - name: Create Debian package
         run: |
           # Create package structure
-          mkdir -p package-root/opt/photoframe
+          mkdir -p package-root/opt/photoframe/frontend
           mkdir -p package-root/etc/photoframe
           mkdir -p package-root/usr/bin
+          mkdir -p package-root/usr/local/bin
           
           # Copy Go backend binary
           cp digital-photo-frame-arm64 package-root/opt/photoframe/digital-photo-frame-aarch64
           
-          # Copy Tauri frontend binary
-          cp photo-frame package-root/opt/photoframe/photo-frame-frontend
-          chmod +x package-root/opt/photoframe/photo-frame-frontend
+          # Copy Vue.js frontend files
+          cp -r dist/* package-root/opt/photoframe/frontend/
           
-          # Copy config and wrapper
+          # Copy config
           cp backend/config.yaml.example package-root/etc/photoframe/config.yaml
-          cp packaging/wrapper/digital-photo-frame package-root/usr/bin/
-          chmod +x package-root/usr/bin/digital-photo-frame
+          
+          # Copy launcher scripts
+          cp packaging/scripts/start-chromium-photoframe.sh package-root/usr/local/bin/
+          cp packaging/scripts/photoframe-launcher.sh package-root/usr/bin/
+          chmod +x package-root/usr/local/bin/start-chromium-photoframe.sh
+          chmod +x package-root/usr/bin/photoframe-launcher.sh
+          
+          # Create symlink for easy access
+          ln -sf photoframe-launcher.sh package-root/usr/bin/photoframe
           
           # Build Debian package
           VERSION=${GITHUB_REF#refs/tags/v}
@@ -114,11 +113,12 @@ jobs:
           fpm -s dir -t deb -n photoframe-pi64 -v "$VERSION" \
             --architecture arm64 \
             --depends "libc6" \
-            --description "Digital Photo Frame for Raspberry Pi 64-bit" \
+            --depends "chromium-browser" \
+            --depends "curl" \
+            --description "Digital Photo Frame for Raspberry Pi 64-bit (Chromium)" \
             --url "https://github.com/${{ github.repository }}" \
             --maintainer "${{ github.actor }}" \
             --license "MIT" \
-            --after-install packaging/debian/postinst \
             -C package-root \
             opt etc usr
             
@@ -134,7 +134,7 @@ jobs:
         with:
           files: "*.deb"
           body: |
-            ## Digital Photo Frame - ARM64
+            ## Digital Photo Frame - ARM64 (Chromium)
             
             ### Installation
             ```bash
@@ -144,11 +144,19 @@ jobs:
             
             ### Usage
             ```bash
-            # Run backend
-            cd /etc/photoframe && digital-photo-frame
+            # Complete launcher (backend + frontend)
+            photoframe
             
-            # Run frontend
-            /opt/photoframe/photo-frame-frontend --fullscreen
+            # Or run manually:
+            # 1. Start backend: cd /etc/photoframe && /opt/photoframe/digital-photo-frame-aarch64
+            # 2. Start frontend: /usr/local/bin/start-chromium-photoframe.sh
             ```
+            
+            ### Features
+            - **Chromium-based**: Uses native Chromium browser in kiosk mode
+            - **No GTK Issues**: Avoids all Tauri/GTK compatibility problems
+            - **Pi Optimized**: Works perfectly on Raspberry Pi 3B+
+            - **Fullscreen Kiosk**: True fullscreen mode with no browser chrome
+            - **Auto-slideshow**: 15-second automatic image progression
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

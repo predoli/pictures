@@ -1,5 +1,4 @@
 import { ref, onMounted, onUnmounted, watch } from 'vue';
-import { convertFileSrc } from '@tauri-apps/api/core';
 import type { Image, ImagesResponse, OrderingMode } from '../types';
 import { cookieUtils } from '../utils/cookies';
 
@@ -33,8 +32,8 @@ export function usePhotoFrame(preloadAheadCount: number = PRELOAD_AHEAD_COUNT) {
     img.onerror = () => {
       console.error(`Failed to preload image ${imageIndex}: ${image.filename}`);
     };
-    // Use convertFileSrc for local file paths, fallback to HTTP URL
-    img.src = image.file_path ? convertFileSrc(image.file_path) : `${API_BASE}${image.url}`;
+    // Use HTTP URL from backend static file serving
+    img.src = `${API_BASE}${image.url}`;
   };
 
   const preloadImagesAhead = (fromIndex: number): void => {
