@@ -2,20 +2,24 @@ import { defineConfig } from "vite";
 import vue from "@vitejs/plugin-vue";
 
 // https://vitejs.dev/config/
-export default defineConfig(async () => ({
+export default defineConfig({
   plugins: [vue()],
-
-  // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
-  //
-  // 1. prevent vite from obscuring rust errors
-  clearScreen: false,
-  // 2. tauri expects a fixed port, fail if that port is not available
-  server: {
-    port: 1420,
-    strictPort: true,
-    watch: {
-      // 3. tell vite to ignore watching `src-tauri`
-      ignored: ["**/src-tauri/**"],
-    },
-  },
-}));
+  
+  // Build configuration for Chromium file:// protocol
+  base: './',
+  
+  build: {
+    outDir: 'dist',
+    assetsDir: 'assets',
+    // Ensure CSS is inlined for file:// protocol compatibility
+    cssCodeSplit: false,
+    rollupOptions: {
+      output: {
+        // Don't hash filenames for simpler file:// access
+        entryFileNames: '[name].js',
+        chunkFileNames: '[name].js',
+        assetFileNames: '[name].[ext]'
+      }
+    }
+  }
+});
