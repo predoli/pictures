@@ -19,8 +19,11 @@
           :class="['image-slide', { active: index === currentIndex }]"
         >
           <img
-            :src="`data:${image.mime_type};base64,${image.data}`"
+            :src="getImageUrl(image)"
             :alt="image.filename"
+            @load="handleImageLoad(index)"
+            @error="handleImageError(index)"
+            loading="lazy"
           />
         </div>
       </div>
@@ -96,6 +99,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
+import { convertFileSrc } from '@tauri-apps/api/core';
 import { usePhotoFrame } from '../composables/usePhotoFrame';
 
 const {
@@ -136,6 +140,25 @@ const handleImageClick = () => {
 const handleTouchEnd = (event: TouchEvent) => {
   event.preventDefault();
   nextImage();
+};
+
+const handleImageLoad = (index: number) => {
+  // Image loaded successfully - could add any success handling here
+};
+
+const handleImageError = (index: number) => {
+  const image = images.value[index];
+  const url = getImageUrl(image);
+  console.error(`Failed to load image ${index}: ${image?.filename} from URL: ${url}`);
+};
+
+const getImageUrl = (image: any) => {
+  // Use the absolute file path from the backend with convertFileSrc
+  if (image.file_path) {
+    return convertFileSrc(image.file_path);
+  }
+  // Fallback to HTTP URL
+  return `http://localhost:8080${image.url}`;
 };
 </script>
 
@@ -241,6 +264,7 @@ const handleTouchEnd = (event: TouchEvent) => {
 .photo-frame:hover .controls {
   opacity: 1;
 }
+
 
 .controls .btn {
   font-size: 14px;

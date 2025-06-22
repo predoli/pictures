@@ -1,12 +1,14 @@
 import { ref, onMounted, onUnmounted, watch } from 'vue';
+import { convertFileSrc } from '@tauri-apps/api/core';
 import type { Image, ImagesResponse, OrderingMode } from '../types';
 import { cookieUtils } from '../utils/cookies';
 
 const API_BASE = 'http://localhost:8080';
 const SLIDE_INTERVAL = 15000; // 15 seconds
 const IMAGES_PER_BATCH = 10;
+const PRELOAD_AHEAD_COUNT = 5; // Number of images to preload ahead
 
-export function usePhotoFrame() {
+export function usePhotoFrame(preloadAheadCount: number = PRELOAD_AHEAD_COUNT) {
   const images = ref<Image[]>([]);
   const currentIndex = ref(0);
   const isPaused = ref(false);
@@ -14,8 +16,35 @@ export function usePhotoFrame() {
   const totalCount = ref(0);
   const isLoading = ref(false);
   const error = ref<string | null>(null);
+  const preloadedImages = ref<Set<number>>(new Set()); // Track which images are preloaded
 
   let slideInterval: number | null = null;
+
+  const preloadImage = (imageIndex: number): void => {
+    if (preloadedImages.value.has(imageIndex) || !images.value[imageIndex]) {
+      return; // Already preloaded or image doesn't exist
+    }
+
+    const image = images.value[imageIndex];
+    const img = new Image();
+    img.onload = () => {
+      preloadedImages.value.add(imageIndex);
+    };
+    img.onerror = () => {
+      console.error(`Failed to preload image ${imageIndex}: ${image.filename}`);
+    };
+    // Use convertFileSrc for local file paths, fallback to HTTP URL
+    img.src = image.file_path ? convertFileSrc(image.file_path) : `${API_BASE}${image.url}`;
+  };
+
+  const preloadImagesAhead = (fromIndex: number): void => {
+    for (let i = 1; i <= preloadAheadCount; i++) {
+      const targetIndex = fromIndex + i;
+      if (targetIndex < images.value.length) {
+        preloadImage(targetIndex);
+      }
+    }
+  };
 
   const fetchImages = async (lastImage?: string): Promise<void> => {
     if (isLoading.value) return;
@@ -49,11 +78,15 @@ export function usePhotoFrame() {
       if (!lastImage) {
         images.value = data.images;
         currentIndex.value = 0;
-        console.log(`Loaded initial batch: ${data.images.length} images`);
+        preloadedImages.value.clear(); // Clear preload cache
+        // Preload images ahead from the current position
+        preloadImagesAhead(0);
       } else {
         // Append new images for pagination
         images.value.push(...data.images);
-        console.log(`Loaded next batch: ${data.images.length} new images (total: ${images.value.length})`);
+        // Preload newly loaded images if they're in the ahead range
+        const startPreloadFrom = Math.max(0, currentIndex.value);
+        preloadImagesAhead(startPreloadFrom);
       }
 
       totalCount.value = data.total_count;
@@ -71,19 +104,24 @@ export function usePhotoFrame() {
 
     const nextIndex = currentIndex.value + 1;
 
-    // Check if we're approaching the end and need to load more images
-    // Load next batch when we're on the second-to-last image
-    if (nextIndex >= images.value.length - 1 && images.value.length < totalCount.value && !isLoading.value) {
-      console.log(`Approaching end of current batch (${nextIndex + 1}/${images.value.length}), loading next batch...`);
+    // Check if we need to load more images before we run out
+    // Load next batch when we're within preloadAheadCount images of the end
+    const loadTriggerDistance = Math.max(preloadAheadCount, 2); 
+    if (nextIndex >= images.value.length - loadTriggerDistance && 
+        images.value.length < totalCount.value && 
+        !isLoading.value) {
       const lastImage = images.value[images.value.length - 1]?.filename;
       await fetchImages(lastImage);
     }
 
     if (nextIndex < images.value.length) {
       currentIndex.value = nextIndex;
+      // Preload images ahead from the new current position
+      preloadImagesAhead(nextIndex);
     } else if (images.value.length >= totalCount.value) {
       // Loop back to beginning only if we have all images
       currentIndex.value = 0;
+      preloadImagesAhead(0);
     }
     // If we don't have more images and haven't loaded all, stay on current image
   };
@@ -94,9 +132,12 @@ export function usePhotoFrame() {
     const prevIndex = currentIndex.value - 1;
     if (prevIndex >= 0) {
       currentIndex.value = prevIndex;
+      // Preload images ahead from the new current position
+      preloadImagesAhead(prevIndex);
     } else {
       // Loop to end
       currentIndex.value = images.value.length - 1;
+      preloadImagesAhead(images.value.length - 1);
     }
   };
 
@@ -140,9 +181,6 @@ export function usePhotoFrame() {
     const savedIndex = findImageIndex(lastImageName);
     if (savedIndex !== -1) {
       currentIndex.value = savedIndex;
-      console.log(`Restored position to image: ${lastImageName} (index: ${savedIndex})`);
-    } else {
-      console.log(`Last image "${lastImageName}" not found in current batch, keeping current position`);
     }
   };
 
@@ -154,6 +192,7 @@ export function usePhotoFrame() {
     // Reload images with new ordering
     images.value = [];
     currentIndex.value = 0;
+    preloadedImages.value.clear(); // Clear preload cache
     await fetchImages();
   };
 
@@ -193,6 +232,10 @@ export function usePhotoFrame() {
     totalCount,
     isLoading,
     error,
+    preloadedImages,
+    
+    // Configuration
+    preloadAheadCount,
     
     // Actions
     nextImage,

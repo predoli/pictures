@@ -1,9 +1,7 @@
 package main
 
 import (
-	"encoding/base64"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"mime"
 	"net/http"
@@ -19,7 +17,8 @@ import (
 
 type Image struct {
 	Filename     string    `json:"filename"`
-	Data         string    `json:"data"`
+	FilePath     string    `json:"file_path"`
+	URL          string    `json:"url"`
 	MimeType     string    `json:"mime_type"`
 	Size         int64     `json:"size"`
 	Width        int       `json:"width,omitempty"`
@@ -53,25 +52,44 @@ func isImageFile(filename string) bool {
 }
 
 func loadImageFromFile(path string) (*Image, error) {
-	info, err := os.Stat(path)
+	// Ensure we have an absolute path
+	absPath, err := filepath.Abs(path)
+	if err != nil {
+		log.Printf("Error getting absolute path for %s: %v", path, err)
+		absPath = path // fallback to original path
+	}
+	
+	info, err := os.Stat(absPath)
 	if err != nil {
 		return nil, err
 	}
 
-	data, err := ioutil.ReadFile(path)
-	if err != nil {
-		return nil, err
-	}
-
-	base64Data := base64.StdEncoding.EncodeToString(data)
 	mimeType := mime.TypeByExtension(strings.ToLower(filepath.Ext(path)))
 	if mimeType == "" {
 		mimeType = "application/octet-stream"
 	}
 
+	// Find which WebDAV directory this file belongs to and create relative URL
+	var url string
+	for _, dir := range config.WebDAV.Directories {
+		if strings.HasPrefix(path, dir.LocalPath) {
+			relativePath, err := filepath.Rel(dir.LocalPath, path)
+			if err == nil {
+				url = "/static/" + dir.Name + "/" + strings.ReplaceAll(relativePath, "\\", "/")
+				break
+			}
+		}
+	}
+	
+	// Fallback if no directory matched
+	if url == "" {
+		url = "/static/" + filepath.Base(path)
+	}
+
 	return &Image{
 		Filename:     filepath.Base(path),
-		Data:         base64Data,
+		FilePath:     absPath, // Use absolute path
+		URL:          url,
 		MimeType:     mimeType,
 		Size:         info.Size(),
 		ModifiedDate: info.ModTime(),
@@ -186,14 +204,21 @@ func getImages(c *gin.Context) {
 	// Scan all configured WebDAV directories for images
 	var allImages []Image
 	for _, dir := range config.WebDAV.Directories {
-		if _, err := os.Stat(dir.LocalPath); os.IsNotExist(err) {
-			log.Printf("Directory %s does not exist, skipping", dir.LocalPath)
+		// Ensure we have an absolute path for the directory
+		absDir, err := filepath.Abs(dir.LocalPath)
+		if err != nil {
+			log.Printf("Error getting absolute path for directory %s: %v", dir.LocalPath, err)
+			absDir = dir.LocalPath // fallback
+		}
+		
+		if _, err := os.Stat(absDir); os.IsNotExist(err) {
+			log.Printf("Directory %s does not exist, skipping", absDir)
 			continue
 		}
 
-		dirImages, err := scanDirectoryForImages(dir.LocalPath)
+		dirImages, err := scanDirectoryForImages(absDir)
 		if err != nil {
-			log.Printf("Error scanning directory %s: %v", dir.LocalPath, err)
+			log.Printf("Error scanning directory %s: %v", absDir, err)
 			continue
 		}
 		allImages = append(allImages, dirImages...)
@@ -243,6 +268,15 @@ func main() {
 	})
 
 	r.GET("/images", getImages)
+	
+	// Serve static images from all configured directories
+	for _, dir := range config.WebDAV.Directories {
+		if _, err := os.Stat(dir.LocalPath); !os.IsNotExist(err) {
+			staticPath := "/static/" + dir.Name
+			r.Static(staticPath, dir.LocalPath)
+			log.Printf("Serving static files from %s at %s", dir.LocalPath, staticPath)
+		}
+	}
 
 	serverAddr := fmt.Sprintf("%s:%s", config.Server.Host, config.Server.Port)
 	log.Printf("Starting server on %s", serverAddr)

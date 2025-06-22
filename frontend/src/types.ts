@@ -1,7 +1,8 @@
 // Generated from OpenAPI specification
 export interface Image {
   filename: string;
-  data: string; // Base64 encoded image data
+  file_path: string; // Absolute file path on server
+  url: string; // Relative URL for HTTP access
   mime_type: string;
   size: number;
   width?: number;
