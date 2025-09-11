@@ -24,15 +24,9 @@ else
     exit 1
 fi
 
-# Check if index.html exists and doesn't have Tauri references
+# Check if index.html exists
 if [ -f "dist/index.html" ]; then
     echo "✅ index.html exists"
-    
-    if grep -q "tauri" dist/index.html; then
-        echo "⚠️  Warning: Found Tauri references in index.html"
-    else
-        echo "✅ No Tauri references found in index.html"
-    fi
 else
     echo "❌ index.html not found in dist"
     exit 1

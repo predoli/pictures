@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a digital photo frame application with both backend (Go) and frontend (Vue.js/Tauri) components. The backend serves images via REST API with WebDAV synchronization, while the frontend provides web and desktop interfaces.
+This is a digital photo frame application with both backend (Go) and frontend (Vue.js) components. The backend serves images via REST API with WebDAV synchronization, while the frontend provides web interfaces.
 
 ## Architecture
 
@@ -14,9 +14,8 @@ This is a digital photo frame application with both backend (Go) and frontend (V
 - **webdav_sync.go**: WebDAV client implementation for periodic synchronization
 - **openapi.yaml**: API specification for the image serving endpoint
 
-### Frontend (Vue.js/Tauri)
+### Frontend (Vue.js)
 - **src/**: Vue.js components and composables
-- **src-tauri/**: Tauri desktop wrapper for fullscreen kiosk mode
 - **dist/**: Built web files served by backend
 
 ### Packaging
@@ -48,7 +47,6 @@ The application loads configuration from `config.yaml` which defines:
 
 ### Frontend Modes
 - **Web Interface**: Responsive browser-based photo frame
-- **Desktop App**: Tauri-based fullscreen kiosk mode
 - **Auto-switching**: Configurable display modes and timing
 
 ## Development Commands
@@ -69,8 +67,6 @@ cd frontend
 npm install          # Install dependencies
 npm run dev          # Web development server
 npm run build        # Build web version
-npm run tauri:dev    # Desktop app development
-npm run tauri:build  # Build desktop app
 ```
 
 ### Testing
@@ -102,9 +98,8 @@ cd packaging
 - WebDAV servers: Optional, for automatic photo sync
 
 ### Frontend Configuration
-- Tauri config: `frontend/src-tauri/tauri.conf.json`
 - Vite config: `frontend/vite.config.ts`
-- Build target: Depends on platform (web always, desktop conditional)
+- Build target: Depends on platform (web always)
 
 ## Dependencies
 
@@ -115,7 +110,6 @@ cd packaging
 
 ### Frontend
 - **Vue 3**: Frontend framework
-- **Tauri**: Desktop app wrapper
 - **TypeScript**: Type safety
 - **Vite**: Build tool
 
@@ -128,7 +122,6 @@ cd packaging
 ### Development
 - Backend runs on `localhost:8080`
 - Frontend dev server on `localhost:1420` (Vite default)
-- Desktop app launches in window mode
 
 ### Production (Raspberry Pi)
 - Backend service: `photoframe.service`
@@ -145,9 +138,8 @@ cd packaging
 │   ├── webdav_sync.go      # WebDAV sync
 │   ├── config.yaml.example # Config template
 │   └── .gitignore          # Excludes images and binaries
-├── frontend/               # Vue.js web app + Tauri
+├── frontend/               # Vue.js web app
 │   ├── src/                # Vue components
-│   ├── src-tauri/          # Desktop wrapper
 │   ├── dist/               # Built files (gitignored)
 │   └── .gitignore          # Excludes build artifacts
 ├── packaging/              # Debian packaging
@@ -178,9 +170,7 @@ Images are loaded into memory and base64-encoded for JSON response. The applicat
 - Working directory must contain config.yaml
 
 ### Frontend Not Building
-- Tauri cross-compilation can fail (frontend is optional)
 - Web interface always available via backend
-- Desktop mode requires GUI environment
 
 ### WebDAV Sync Issues
 - Check network connectivity and credentials

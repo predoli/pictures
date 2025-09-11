@@ -11,7 +11,6 @@ A Raspberry Pi digital photo frame using Vue.js frontend in Chromium kiosk mode 
 ## Features
 
 - **Chromium-based**: Uses native Chromium browser for maximum compatibility
-- **No GTK Issues**: Completely avoids Tauri/GTK compatibility problems
 - **Raspberry Pi Optimized**: Works perfectly on Pi 3B and newer
 - **Kiosk Mode**: True fullscreen with no browser interface
 - **Auto-slideshow**: 15-second intervals with smooth transitions
