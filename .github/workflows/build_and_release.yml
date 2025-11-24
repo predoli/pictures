@@ -24,22 +24,20 @@ jobs:
         cd backend
         GOOS=linux GOARCH=arm64 go build -o ../dist/backend_arm64/digital-photo-frame main.go webdav_sync.go config.go
 
-    - name: Install Qt dependencies
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y qt6-base-dev qt6-declarative-dev qt6-base-private-dev libqt6quick6 libqt6quickcontrols2-6
+    - name: Set up QEMU
+      uses: docker/setup-qemu-action@v2
 
-    # Note: Cross-compiling Qt is complex. For this example, we'll assume we can build
-    # or we use a container. Since we are on x86_64 runner, we can't build for ARM64 easily without cross-compiler.
-    # We will skip the actual Qt build here and assume it's done or mocked for the image step
-    # In a real scenario, we would use a Docker container with cross-toolchain.
-    
-    - name: Build Frontend (Mock for now - Real cross-compile requires setup)
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v2
+
+    - name: Build Frontend (Docker ARM64)
       run: |
         mkdir -p dist/frontend_arm64
-        # Create a dummy binary for testing the pipeline if we can't cross-compile
-        touch dist/frontend_arm64/appdigital-photo-frame-qt
-        chmod +x dist/frontend_arm64/appdigital-photo-frame-qt
+        # Build the builder image
+        docker build -t dpf-builder -f packaging/Dockerfile.build .
+        # Run the build container
+        # We mount the current directory to /src so the container can access source and write output
+        docker run --rm -v $(pwd):/src dpf-builder sh -c "mkdir -p /build/build && cmake -S /src/qt-frontend -B /build/build -DCMAKE_BUILD_TYPE=Release && cmake --build /build/build --parallel && cp /build/build/appdigital-photo-frame-qt /src/dist/frontend_arm64/"
 
     - name: Create Image
       run: |

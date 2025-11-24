@@ -1,5 +1,0 @@
-#!/bin/bash
-# Simplified wrapper script for ARM64 only
-
-# Execute the ARM64 binary directly
-exec /opt/photoframe/digital-photo-frame-aarch64 "$@"

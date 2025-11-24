@@ -1,214 +1,80 @@
 # Digital Photo Frame
 
-A modern digital photo frame application with web interface and optional desktop app, designed for Raspberry Pi.
+A modern digital photo frame application for Raspberry Pi, featuring a Go backend for WebDAV syncing and a native Qt/C++ frontend for smooth performance on low-end hardware (Pi Zero 2W).
 
 ## ✨ Features
 
-- **Web Interface**: Clean, responsive photo display
-- **WebDAV Sync**: Automatically sync photos from cloud storage
-- **Multiple Display Modes**: Name/date ordering, random shuffle
-- **Pagination**: Navigate through large photo collections
-- **Base64 API**: Efficient photo serving via REST API
-- **Raspberry Pi Optimized**: Native ARM builds for all Pi models
-- **Auto-start Service**: Runs on boot with systemd
-- **Desktop App**: Optional Tauri-based desktop application
+- **Native Qt Frontend**: Smooth slideshows with cross-fade transitions, optimized for Raspberry Pi Zero 2W.
+- **WebDAV Sync**: Automatically sync photos from cloud storage via the Go backend.
+- **Multiple Display Modes**: Name/date ordering, random shuffle.
+- **Direct Framebuffer**: Runs directly on `linuxfb` without needing X11 or Wayland (though compatible with them).
+- **Custom OS Image**: Automated generation of a minimal Raspberry Pi OS Lite image with the application pre-installed.
 
 ## 🚀 Quick Install (Raspberry Pi)
 
-### 1. Download & Install
-```bash
-# Pi Zero
-wget https://github.com/yourrepo/releases/latest/download/photoframe-pi-zero_*.deb
-sudo apt install ./photoframe-pi-zero_*.deb
+### 1. Download Image
+Go to the [Releases](../../releases) page and download the latest `raspios-lite-arm64.img.xz`.
 
-# Pi 3/4
-wget https://github.com/yourrepo/releases/latest/download/photoframe-pi_*.deb
-sudo apt install ./photoframe-pi_*.deb
+### 2. Flash to SD Card
+Use a tool like [Raspberry Pi Imager](https://www.raspberrypi.com/software/) or `dd` to flash the image to your SD card.
 
-# Pi 64-bit
-wget https://github.com/yourrepo/releases/latest/download/photoframe-pi64_*.deb
-sudo apt install ./photoframe-pi64_*.deb
-```
+### 3. Boot
+Insert the SD card into your Raspberry Pi (Zero 2W, 3B, 4, 5) and power it on. The application will start automatically.
 
-### 2. Configure
-```bash
-# Edit configuration
-sudo nano /etc/photoframe/config.yaml
+### 4. Configure
+The default configuration expects images in `/opt/digital-photo-frame/images` or configured WebDAV servers.
+To configure WebDAV:
+1. SSH into the Pi (default user/pass: `pi`/`raspberry` or as configured in the image).
+2. Edit `/opt/digital-photo-frame/config.yaml`.
+3. Restart the backend: `sudo systemctl restart dpf-backend`.
 
-# Restart service
-sudo systemctl restart photoframe
-```
-
-### 3. Access
-Open `http://your-pi-ip:8080` in any web browser
-
-## ⚙️ Configuration
-
-Edit `/etc/photoframe/config.yaml`:
-
-```yaml
-server:
-  host: "0.0.0.0"  # Listen on all interfaces
-  port: 8080       # Web server port
-
-directories:
-  - path: "/var/lib/photoframe/images"
-
-webdav:
-  sync_interval: "1h"
-  servers:
-    - url: "https://your-webdav-server.com"
-      username: "your-username"
-      password: "your-password"
-      remote_path: "/photos"
-      local_path: "/var/lib/photoframe/images/webdav"
-
-logging:
-  level: "info"
-```
-
-## 🛠️ Service Management
-
-```bash
-# Control service
-sudo systemctl start photoframe
-sudo systemctl stop photoframe
-sudo systemctl restart photoframe
-sudo systemctl status photoframe
-
-# View logs
-sudo journalctl -u photoframe -f
-
-# Uninstall
-sudo apt remove photoframe-pi-zero  # or photoframe-pi, photoframe-pi64
-```
-
-## 🏗️ Development
+## 🛠️ Development
 
 ### Prerequisites
-- Go 1.23+
-- Node.js 18+
-- Rust (for desktop app)
+- Go 1.21+
+- Qt 6.2+ (Core, Quick, Network, Qml)
+- CMake 3.16+
 
-### Backend
+### Backend (Go)
 ```bash
 cd backend
 cp config.yaml.example config.yaml
-# Edit config.yaml for your setup
 go run .
 ```
 
-### Frontend
+### Frontend (Qt/C++)
 ```bash
-cd frontend
-npm install
-npm run dev          # Web development
-npm run tauri:dev    # Desktop app development
+cd qt-frontend
+mkdir build && cd build
+cmake ..
+make
+./appdigital-photo-frame-qt
 ```
 
-### Building
+## 📦 Building the OS Image
+
+The repository includes scripts to generate a custom Raspberry Pi OS image.
+
 ```bash
-# Backend
-cd backend
-go build -o digital-photo-frame .
-
-# Web frontend
-cd frontend
-npm run build
-
-# Desktop app
-npm run tauri:build
+# Requires root privileges and ARM64 environment (or emulation)
+sudo ./packaging/create_image.sh
 ```
 
-## 📡 API
-
-### Get Images
-```
-GET /images?count=10&ordering=random&last_image=photo.jpg
-```
-
-**Parameters:**
-- `count`: Number of images to return
-- `ordering`: `name_asc`, `name_desc`, `date_asc`, `date_desc`, `random`
-- `last_image`: For pagination (continuation)
-
-**Response:**
-```json
-{
-  "images": [
-    {
-      "name": "photo.jpg",
-      "data": "base64-encoded-image",
-      "modTime": "2023-01-01T00:00:00Z"
-    }
-  ]
-}
-```
+This script:
+1. Downloads the latest Raspberry Pi OS Lite.
+2. Installs Qt6 dependencies.
+3. Compiles and installs the Go backend and Qt frontend.
+4. Sets up systemd services (`dpf-backend` and `dpf-frontend`).
 
 ## 🗂️ Project Structure
 
 ```
-├── backend/                 # Go web server
-│   ├── main.go             # Entry point
-│   ├── config.go           # Configuration handling
-│   ├── webdav_sync.go      # WebDAV synchronization
-│   └── config.yaml.example # Config template
-├── frontend/               # Vue.js web app
-│   ├── src/                # Vue components
-│   ├── src-tauri/          # Tauri desktop wrapper
-│   └── dist/               # Built web files
-├── packaging/              # Debian package files
-│   ├── systemd/            # Systemd service
-│   ├── debian/             # Install scripts
-│   └── wrapper/            # Binary wrapper
-└── .github/workflows/      # CI/CD
+├── backend/                 # Go web server & WebDAV sync
+├── qt-frontend/             # Qt/C++ QML application
+├── packaging/               # Build and image generation scripts
+└── .github/workflows/       # CI/CD for image generation
 ```
-
-## 🎯 Supported Platforms
-
-**Debian Packages:**
-- Raspberry Pi Zero (ARMv6)
-- Raspberry Pi 3/4 (ARMv7)
-- Raspberry Pi 64-bit (ARM64)
-
-**Manual Build:**
-- Linux x86_64
-- macOS (development)
-- Windows (development)
-
-## 🔄 Auto-sync
-
-Configure WebDAV servers to automatically sync photos:
-
-1. Edit `/etc/photoframe/config.yaml`
-2. Add your WebDAV server details
-3. Photos sync every hour (configurable)
-4. New photos appear automatically
-
-## 🖥️ Desktop App
-
-Optional Tauri-based desktop application for development and testing:
-
-```bash
-cd frontend
-npm run tauri:dev    # Development
-npm run tauri:build  # Production build
-```
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create feature branch: `git checkout -b feature-name`
-3. Make changes and test
-4. Submit pull request
 
 ## 📄 License
 
-MIT License - see LICENSE file for details
-
-## 🔗 Links
-
-- [Build Guide](BUILD.md)
-- [API Documentation](backend/openapi.yaml)
-- [Releases](../../releases)
-- [Issues](../../issues)
+MIT License
