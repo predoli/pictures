@@ -8,7 +8,7 @@ digital-photo-frame.exe
 digital-photo-frame-*
 
 # Go module cache
-go.sum
+# go.sum
 
 # Logs
 *.log

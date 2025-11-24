@@ -4,6 +4,7 @@ set -e
 # Build Go Backend
 echo "Building Go Backend..."
 cd backend
+go mod download
 GOOS=linux GOARCH=arm64 go build -o ../dist/backend_arm64/digital-photo-frame main.go webdav_sync.go config.go
 cd ..
 
