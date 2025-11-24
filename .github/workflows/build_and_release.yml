@@ -35,10 +35,10 @@ jobs:
       run: |
         mkdir -p dist/frontend_arm64
         # Build the builder image
-        docker build -t dpf-builder -f packaging/Dockerfile.build .
+        docker build --platform linux/arm64 -t dpf-builder -f packaging/Dockerfile.build .
         # Run the build container
         # We mount the current directory to /src so the container can access source and write output
-        docker run --rm -v $(pwd):/src dpf-builder sh -c "mkdir -p /build/build && cmake -S /src/qt-frontend -B /build/build -DCMAKE_BUILD_TYPE=Release && cmake --build /build/build --parallel && cp /build/build/appdigital-photo-frame-qt /src/dist/frontend_arm64/"
+        docker run --platform linux/arm64 --rm -v $(pwd):/src dpf-builder sh -c "mkdir -p /build/build && cmake -S /src/qt-frontend -B /build/build -DCMAKE_BUILD_TYPE=Release && cmake --build /build/build --parallel && cp /build/build/appdigital-photo-frame-qt /src/dist/frontend_arm64/"
 
     - name: Create Image
       run: |

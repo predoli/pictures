@@ -14,8 +14,8 @@ mkdir -p dist/frontend_arm64
 
 if command -v docker &> /dev/null; then
     echo "Docker found, building in container..."
-    docker build -t dpf-builder -f packaging/Dockerfile.build .
-    docker run --rm -v "$(pwd):/src" dpf-builder sh -c "mkdir -p /build/build && cmake -S /src/qt-frontend -B /build/build -DCMAKE_BUILD_TYPE=Release && cmake --build /build/build --parallel && cp /build/build/appdigital-photo-frame-qt /src/dist/frontend_arm64/"
+    docker build --platform linux/arm64 -t dpf-builder -f packaging/Dockerfile.build .
+    docker run --platform linux/arm64 --rm -v "$(pwd):/src" dpf-builder sh -c "mkdir -p /build/build && cmake -S /src/qt-frontend -B /build/build -DCMAKE_BUILD_TYPE=Release && cmake --build /build/build --parallel && cp /build/build/appdigital-photo-frame-qt /src/dist/frontend_arm64/"
 else
     echo "Docker not found. Skipping Qt build. Install Docker to build the frontend."
     exit 1
