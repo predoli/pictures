@@ -1,0 +1,20 @@
+# Build artifacts
+dist/
+build/
+*.o
+*.a
+*.so
+*.dylib
+*.dll
+
+# Qt
+qt-frontend/build/
+*.user
+*.qmlc
+*.jsc
+*.pro.user
+CMakeLists.txt.user
+
+# OS
+.DS_Store
+.Thumbs.db
