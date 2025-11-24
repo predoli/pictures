@@ -48,7 +48,11 @@ echo "Copying application files..."
 mkdir -p "$MOUNT_POINT/opt/digital-photo-frame"
 cp dist/backend_arm64/digital-photo-frame "$MOUNT_POINT/opt/digital-photo-frame/backend"
 cp dist/frontend_arm64/appdigital-photo-frame-qt "$MOUNT_POINT/opt/digital-photo-frame/frontend"
-cp backend/config.yaml.example "$MOUNT_POINT/opt/digital-photo-frame/config.yaml"
+cp dist/frontend_arm64/appdigital-photo-frame-qt "$MOUNT_POINT/opt/digital-photo-frame/frontend"
+# Copy config to boot partition for easy access
+cp backend/config.yaml.example "$MOUNT_POINT/boot/firmware/dpf-config.yaml"
+# Symlink config from boot partition to app directory
+ln -sf /boot/firmware/dpf-config.yaml "$MOUNT_POINT/opt/digital-photo-frame/config.yaml"
 
 # Install Dependencies in Chroot
 echo "Installing dependencies in chroot..."
