@@ -29,7 +29,7 @@ dd if=/dev/zero bs=1M count=500 >> "$IMAGE_NAME"
 parted "$IMAGE_NAME" resizepart 2 100%
 losetup -fP "$IMAGE_NAME"
 LOOP_DEVICE=$(losetup -j "$IMAGE_NAME" | cut -d: -f1)
-e2fsck -f "${LOOP_DEVICE}p2"
+e2fsck -y -f "${LOOP_DEVICE}p2"
 resize2fs "${LOOP_DEVICE}p2"
 
 # Mount Image
@@ -54,7 +54,7 @@ cp backend/config.yaml.example "$MOUNT_POINT/opt/digital-photo-frame/config.yaml
 echo "Installing dependencies in chroot..."
 cat << EOF | chroot "$MOUNT_POINT"
 apt-get update
-apt-get install -y qt6-base-dev qt6-declarative-dev qml6-module-qtquick-controls2 qml6-module-qtquick-layouts qml6-module-qtqml-workerscript
+apt-get install -y qt6-base-dev qt6-declarative-dev qml6-module-qtquick-controls qml6-module-qtquick-layouts qml6-module-qtqml-workerscript
 EOF
 
 # Configure Systemd Services
