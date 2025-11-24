@@ -40,6 +40,8 @@ public:
     QVariant data(const QModelIndex &index, int role = Qt::DisplayRole) const override;
     QHash<int, QByteArray> roleNames() const override;
 
+    Q_INVOKABLE QVariantMap get(int row) const;
+
     void setImages(const QList<ImageEntry> &images);
     void clear();
 
